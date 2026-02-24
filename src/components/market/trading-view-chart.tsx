@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
 
 interface TradingViewChartProps {
   symbol?: string;
   theme?: 'light' | 'dark';
   autosize?: boolean;
+  hideBorder?: boolean;
 }
 
 export function TradingViewChart({ 
   symbol = "NIFTY", 
   theme = "light",
-  autosize = true 
+  autosize = true,
+  hideBorder = false
 }: TradingViewChartProps) {
   const container = useRef<HTMLDivElement>(null);
 
@@ -49,7 +52,13 @@ export function TradingViewChart({
   }, [symbol, theme, autosize]);
 
   return (
-    <div className="tradingview-widget-container h-full w-full overflow-hidden border border-border rounded-xl shadow-sm" ref={container}>
+    <div 
+      className={cn(
+        "tradingview-widget-container h-full w-full overflow-hidden",
+        !hideBorder && "border border-border rounded-xl shadow-sm"
+      )} 
+      ref={container}
+    >
       <div className="tradingview-widget-container__widget h-full w-full"></div>
     </div>
   );

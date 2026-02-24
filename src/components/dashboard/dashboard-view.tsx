@@ -6,7 +6,7 @@ import {
   ShieldAlert, Zap, Activity, Radio, TrendingUp, 
   Sparkles, BrainCircuit, Eye, XCircle, 
   ShoppingCart, ChevronRight, ChevronLeft,
-  ArrowUpRight, ArrowDownRight, Power, Skull
+  ArrowUpRight, ArrowDownRight, Power
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -244,24 +244,6 @@ export function Dashboard() {
     });
   };
 
-  const handleKillAll = () => {
-    if (!firestore || !userId) return;
-    
-    // 1. Exit all open positions
-    openPositions?.forEach(pos => {
-      handleExitPosition(pos.id);
-    });
-
-    // 2. Pause all active algos
-    activeAlgos?.forEach(algo => {
-      const algoRef = doc(firestore, 'users', userId, 'algos', algo.id);
-      updateDocumentNonBlocking(algoRef, {
-        status: 'Paused',
-        updatedAt: new Date().toISOString()
-      });
-    });
-  };
-
   const nextStrategy = () => setStrategyIndex((prev) => (prev + 1) % FO_STRATEGIES.length);
   const prevStrategy = () => setStrategyIndex((prev) => (prev - 1 + FO_STRATEGIES.length) % FO_STRATEGIES.length);
 
@@ -310,18 +292,6 @@ export function Dashboard() {
             </div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Active Algos</p>
           </div>
-
-          {/* Kill All Emergency Action */}
-          <Button 
-            variant="destructive" 
-            size="lg" 
-            className="h-[76px] px-6 rounded-2xl gap-2 font-bold uppercase text-xs"
-            onClick={handleKillAll}
-            disabled={!openPositions?.length && !activeAlgos?.length}
-          >
-            <Skull className="w-5 h-5" />
-            Kill All
-          </Button>
         </div>
       </div>
 

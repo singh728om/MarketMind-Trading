@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useFirebase, useUser, useDoc, setDocumentNonBlocking } from '@/firebase';
+import { useFirebase, useUser, useDoc, setDocumentNonBlocking, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 
 const indices = [
@@ -42,8 +42,12 @@ export function TopBar() {
   const { user } = useUser();
   const userId = user?.uid;
 
-  // Fetch user profile from Firestore
-  const userRef = userId ? doc(firestore, 'users', userId) : null;
+  // Use memoized reference to prevent infinite loops and state resets
+  const userRef = useMemoFirebase(() => {
+    if (!firestore || !userId) return null;
+    return doc(firestore, 'users', userId);
+  }, [firestore, userId]);
+
   const { data: userProfile } = useDoc(userRef);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -59,22 +63,28 @@ export function TopBar() {
     return () => clearInterval(timer);
   }, []);
 
+  // Initialize form data when dialog opens or profile loads
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile && isProfileOpen) {
       setFormData({
         name: userProfile.name || "",
         experienceLevel: userProfile.experienceLevel || "Beginner",
         riskProfile: userProfile.riskProfile || "Moderate"
       });
     }
-  }, [userProfile]);
+  }, [userProfile, isProfileOpen]);
 
   const handleUpdateProfile = () => {
-    if (!firestore || !userId || !formData.name.trim()) return;
+    if (!firestore || !userId) return;
+    
+    // Ensure we have at least a name or a placeholder
+    const displayName = formData.name.trim() || user?.email?.split('@')[0] || "User";
+    
     const docRef = doc(firestore, 'users', userId);
     
     setDocumentNonBlocking(docRef, {
       ...formData,
+      name: displayName,
       email: user?.email,
       updatedAt: new Date().toISOString()
     }, { merge: true });

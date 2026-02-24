@@ -1,261 +1,284 @@
+
 "use client";
 
 import React from 'react';
 import { 
   ArrowUpRight, ArrowDownRight, TrendingUp, 
   ShieldAlert, Clock, Info, ChevronRight, 
-  Target, Zap, Activity
+  Target, Zap, Activity, Power, XCircle, Wallet
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { MascotDigi } from "@/components/mascot-digi";
 import { cn } from "@/lib/utils";
+import { 
+  useCollection, 
+  useUser, 
+  useFirestore, 
+  useMemoFirebase,
+  updateDocumentNonBlocking 
+} from '@/firebase';
+import { collection, query, where, doc, serverTimestamp } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function Dashboard() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  // 1. Fetch Open Trades
+  const openTradesQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'trades'),
+      where('status', '==', 'OPEN')
+    );
+  }, [firestore, user?.uid]);
+  const { data: openTrades, isLoading: tradesLoading } = useCollection(openTradesQuery);
+
+  // 2. Fetch Active Algos
+  const activeAlgosQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'algos'),
+      where('status', '==', 'Deployed')
+    );
+  }, [firestore, user?.uid]);
+  const { data: activeAlgos, isLoading: algosLoading } = useCollection(activeAlgosQuery);
+
+  // 3. Fetch Primary Broker Connection (for funds)
+  const brokerQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'broker_connections'),
+      where('isPrimary', '==', true)
+    );
+  }, [firestore, user?.uid]);
+  const { data: brokers, isLoading: brokersLoading } = useCollection(brokerQuery);
+  const primaryBroker = brokers?.[0];
+
+  // Actions
+  const handleExitTrade = (tradeId: string) => {
+    if (!user) return;
+    const tradeRef = doc(firestore, 'users', user.uid, 'trades', tradeId);
+    updateDocumentNonBlocking(tradeRef, {
+      status: 'CLOSED',
+      closedAt: serverTimestamp(),
+      // In a real app, you'd fetch current market price for exitPrice
+      exitPrice: 0, 
+    });
+  };
+
+  const handleKillAll = () => {
+    if (!user || !openTrades) return;
+    openTrades.forEach(trade => {
+      handleExitTrade(trade.id);
+    });
+    // Also pause active algos
+    activeAlgos?.forEach(algo => {
+      const algoRef = doc(firestore, 'users', user.uid, 'algos', algo.id);
+      updateDocumentNonBlocking(algoRef, { status: 'Paused' });
+    });
+  };
+
+  const totalPnL = openTrades?.reduce((acc, trade) => acc + (trade.pnl || 0), 0) || 0;
+
+  if (isUserLoading) {
+    return (
+      <div className="space-y-8 p-8">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-40 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Skeleton className="h-60" />
+          <Skeleton className="h-60" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-extrabold tracking-tight">Good morning, Ajay! 🌅</h1>
+          <h1 className="text-3xl font-headline font-extrabold tracking-tight">
+            Welcome back, {user?.displayName?.split(' ')[0] || 'Trader'}! 🌅
+          </h1>
           <p className="text-muted-foreground mt-1">Your AI guardian is monitoring your session.</p>
         </div>
         <div className="flex flex-col items-end">
-          <div className="mono-font text-3xl font-extrabold price-up">
-            +4,230.00
+          <div className={cn("mono-font text-3xl font-extrabold", totalPnL >= 0 ? "price-up" : "price-down")}>
+            {totalPnL >= 0 ? '+' : ''}{totalPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </div>
-          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Today's Net P&L (2.34%)</p>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Today's Unrealized P&L</p>
         </div>
       </div>
 
-      {/* AI Morning Brief Card */}
-      <Card className="overflow-hidden border-none shadow-purple bg-gradient-to-br from-primary to-primary-dark text-white relative">
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <MascotDigi expression="Focused" size="xl" className="border-none bg-transparent" />
-        </div>
-        <CardHeader className="relative z-10 pb-2">
-          <div className="flex items-center gap-2 mb-2">
-            <MascotDigi expression="Thinking" size="sm" className="bg-white/20 border-white/40" />
-            <Badge className="bg-white/20 text-white border-white/40 backdrop-blur-sm">8:45 AM | Powered by Gemini 1.5 Pro</Badge>
-          </div>
-          <CardTitle className="text-xl font-headline font-bold">🧠 AI Morning Brief</CardTitle>
-        </CardHeader>
-        <CardContent className="relative z-10 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <p className="text-[11px] font-bold text-white/60 uppercase tracking-widest">Market Direction</p>
-              <p className="text-sm font-medium">NIFTY likely to open <span className="mono-font font-bold">+45 pts</span> (SGX +0.3%) based on global cues.</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-[11px] font-bold text-white/60 uppercase tracking-widest">Institutional Flow</p>
-              <p className="text-sm font-medium">FIIs net bought <span className="mono-font font-bold">₹1,240 Cr</span> yesterday. Institutional conviction is high.</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-[11px] font-bold text-white/60 uppercase tracking-widest">AI Stock Picks</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge className="bg-white/20 hover:bg-white/30 text-white border-white/10 cursor-pointer">RELIANCE (Breakout)</Badge>
-                <Badge className="bg-white/20 hover:bg-white/30 text-white border-white/10 cursor-pointer">TATAMOTORS (Bullish)</Badge>
-              </div>
-            </div>
-          </div>
-          <div className="pt-2">
-            <button className="flex items-center gap-2 text-sm font-bold bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors border border-white/10">
-              View Full Analysis <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left/Middle Column */}
+        {/* Left Column */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Risk Guardian Bar */}
-          <Card className="shadow-purple border-primary/10 overflow-hidden">
-            <div className="bg-bull/5 border-b px-4 py-2 flex items-center justify-between">
-               <div className="flex items-center gap-2 text-[10px] font-bold text-bull uppercase tracking-wider">
-                  <ShieldAlert className="w-3 h-3" />
-                  AI Risk Guardian Status: Active
-               </div>
-               <div className="text-[10px] font-bold text-muted-foreground uppercase">
-                  Level: Normal Protected
-               </div>
-            </div>
-            <CardContent className="p-6">
+          
+          {/* Open Positions Section */}
+          <Card className="shadow-purple border-primary/10">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle className="text-lg font-headline font-bold">Open Positions</CardTitle>
+                <CardDescription>Active trades currently in the market</CardDescription>
+              </div>
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                className="h-8 font-bold gap-2"
+                onClick={handleKillAll}
+                disabled={!openTrades?.length && !activeAlgos?.length}
+              >
+                <Power className="w-3.5 h-3.5" />
+                KILL ALL
+              </Button>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold">Daily Loss Limit</p>
-                    <p className="text-xs text-muted-foreground">Today: <span className="price-down">-2,840</span> of <span className="mono-font">-5,000</span> limit</p>
+                {!tradesLoading && openTrades?.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No active positions found.
                   </div>
-                  <Badge variant="outline" className="text-neutral border-neutral/20 bg-neutral/5">🟡 Caution: ₹2,160 remaining</Badge>
-                </div>
-                <div className="space-y-2">
-                  <Progress value={56.8} className="h-2.5 bg-muted" />
-                  <div className="flex justify-between text-[10px] font-bold text-muted-foreground">
-                    <span>0%</span>
-                    <span>56.8% USED</span>
-                    <span>100%</span>
+                )}
+                {openTrades?.map((trade) => (
+                  <div key={trade.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border border-muted-foreground/10">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xs",
+                        trade.side === 'BUY' ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+                      )}>
+                        {trade.side}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{trade.symbol}</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase">{trade.segment} • {trade.qty} Lots</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-8">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Entry</p>
+                        <p className="mono-font text-xs font-bold">{trade.entryPrice}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-muted-foreground font-bold uppercase">P&L</p>
+                        <p className={cn("mono-font text-sm font-bold", (trade.pnl || 0) >= 0 ? "text-bull" : "text-bear")}>
+                          {(trade.pnl || 0).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 text-bear border-bear/20 hover:bg-bear/5"
+                        onClick={() => handleExitTrade(trade.id)}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Exit
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
-                  <div className="p-3 bg-muted/30 rounded-xl border border-muted-foreground/10 text-center">
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Trades</p>
-                    <p className="text-lg font-bold">6/10</p>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-xl border border-muted-foreground/10 text-center">
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Conc. Losses</p>
-                    <p className="text-lg font-bold text-bear">2</p>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-xl border border-muted-foreground/10 text-center">
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Revenge Risk</p>
-                    <p className="text-lg font-bold text-neutral">LOW</p>
-                  </div>
-                  <div className="p-3 bg-muted/30 rounded-xl border border-muted-foreground/10 text-center">
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">AI Status</p>
-                    <p className="text-lg font-bold text-bull">SAFE</p>
-                  </div>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* AI Signals Feed */}
+          {/* Active Algos Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-headline font-bold">Live AI Signals</h3>
-              <button className="text-xs font-bold text-primary hover:underline">Signal Command Center →</button>
-            </div>
+            <h3 className="text-lg font-headline font-bold flex items-center gap-2">
+              <Zap className="w-5 h-5 text-gold" />
+              Active Algos
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { symbol: 'NIFTY 50', type: 'Bull Call Spread', entry: '22450', confidence: 88, target: '22600', sl: '22380' },
-                { symbol: 'RELIANCE', type: 'Breakout', entry: '2985', confidence: 76, target: '3040', sl: '2960' }
-              ].map((signal, i) => (
-                <Card key={i} className="hover:border-primary/30 transition-all cursor-pointer group">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-bull text-white border-none uppercase text-[10px]">BUY</Badge>
-                        <span className="font-bold text-sm">{signal.symbol}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Target className="w-3 h-3 text-gold" />
-                        <span className="text-[10px] font-bold text-gold">{signal.confidence}% Confidence</span>
-                      </div>
+              {activeAlgos?.map((algo) => (
+                <Card key={algo.id} className="hover:border-primary/30 transition-all border-gold/20 bg-gold/5">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-sm">{algo.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Deployed • Capital: ₹{algo.capitalAllocated?.toLocaleString()}</p>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Entry</p>
-                        <p className="mono-font text-xs font-bold">{signal.entry}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Target</p>
-                        <p className="mono-font text-xs font-bold text-bull">{signal.target}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] text-muted-foreground font-bold uppercase">Stoploss</p>
-                        <p className="mono-font text-xs font-bold text-bear">{signal.sl}</p>
-                      </div>
-                    </div>
-                    <div className="pt-2 flex items-center justify-between border-t border-muted-foreground/10 mt-2">
-                      <span className="text-[10px] text-muted-foreground font-medium">{signal.type} Setup</span>
-                      <button className="bg-primary/10 text-primary text-[10px] font-bold px-3 py-1 rounded hover:bg-primary text-white transition-colors">Trade Signal</button>
-                    </div>
+                    <Badge className="bg-bull text-white border-none text-[10px] animate-pulse">RUNNING</Badge>
                   </CardContent>
                 </Card>
               ))}
+              {!algosLoading && activeAlgos?.length === 0 && (
+                <div className="col-span-2 text-center py-4 text-muted-foreground text-sm border border-dashed rounded-xl">
+                  No algorithms currently deployed.
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Right Column */}
         <div className="lg:col-span-4 space-y-6">
+          {/* Account & Funds */}
+          <Card className="shadow-purple border-none bg-surface">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-headline font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Wallet className="w-4 h-4" />
+                Account Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase">Available Margin</p>
+                <p className="mono-font text-2xl font-extrabold text-primary">
+                  ₹{primaryBroker?.availableMargin?.toLocaleString('en-IN') || '0.00'}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted/30 rounded-xl border border-muted-foreground/10">
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase">F&O Margin</p>
+                  <p className="mono-font text-sm font-bold">₹{primaryBroker?.fnoMargin?.toLocaleString() || '0'}</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-xl border border-muted-foreground/10">
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase">Broker</p>
+                  <p className="text-sm font-bold truncate">{primaryBroker?.brokerName || 'Not Linked'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Risk Guardian Bar */}
+          <Card className="shadow-purple border-primary/10 overflow-hidden">
+            <div className="bg-bull/5 border-b px-4 py-2 flex items-center justify-between">
+               <div className="flex items-center gap-2 text-[10px] font-bold text-bull uppercase tracking-wider">
+                  <ShieldAlert className="w-3 h-3" />
+                  Risk Guardian: Active
+               </div>
+            </div>
+            <CardContent className="p-4 space-y-4">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-bold">
+                    <span>DAILY LOSS LIMIT</span>
+                    <span className="text-bear">₹5,000</span>
+                  </div>
+                  <Progress value={Math.abs(totalPnL) / 50} className="h-2" />
+                </div>
+                <p className="text-[11px] leading-tight text-muted-foreground">
+                  <MascotDigi expression="Coaching" size="sm" className="inline-block mr-2 scale-75 -ml-2" />
+                  You are {Math.abs(totalPnL) < 5000 ? 'within safe limits' : 'approaching limit'}. Digi is monitoring.
+                </p>
+            </CardContent>
+          </Card>
+
           {/* FII/DII Today */}
           <Card className="shadow-purple border-none bg-surface">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-headline font-bold uppercase tracking-wider text-muted-foreground">FII/DII Conviction</CardTitle>
+              <CardTitle className="text-sm font-headline font-bold uppercase tracking-wider text-muted-foreground">Market Pulse</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-bull/5 rounded-xl border border-bull/10">
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase">FII Net Cash</p>
-                  <p className="mono-font text-sm font-bold text-bull">₹ +1,240.45 Cr</p>
-                </div>
-                <TrendingUp className="w-6 h-6 text-bull/40" />
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-muted-foreground uppercase">PCR</span>
+                <span className="mono-font text-bull">1.28</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-bear/5 rounded-xl border border-bear/10">
-                <div className="space-y-0.5">
-                  <p className="text-[10px] font-bold text-muted-foreground uppercase">DII Net Cash</p>
-                  <p className="mono-font text-sm font-bold text-bear">₹ -380.20 Cr</p>
-                </div>
-                <ArrowDownRight className="w-6 h-6 text-bear/40" />
-              </div>
-              <p className="text-[11px] leading-tight text-muted-foreground bg-muted/30 p-3 rounded-lg border border-primary/5">
-                <MascotDigi expression="Coaching" size="sm" className="inline-block mr-2 scale-75 -ml-2" />
-                FIIs long-short ratio at <span className="font-bold text-primary">1.24</span>. Bullish momentum expected in Bank Nifty today.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Quick F&O Recommender */}
-          <Card className="shadow-purple border-primary/10">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-headline font-bold uppercase tracking-wider">AI F&O Suggestion</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-bold">NIFTY 50 Expiry</span>
-                <Badge variant="outline" className="text-[10px] font-bold">18 JAN 2025</Badge>
-              </div>
-              <div className="p-3 border rounded-xl border-bull/20 bg-bull/5 space-y-2">
-                <div className="flex items-center justify-between">
-                   <p className="text-[10px] font-bold uppercase text-bull">Bull Call Spread</p>
-                   <span className="mono-font text-[10px] font-bold">68% Conf.</span>
-                </div>
-                <div className="space-y-1">
-                   <p className="text-xs font-medium">Buy 22,450 CE @ ₹85</p>
-                   <p className="text-xs font-medium">Sell 22,600 CE @ ₹42</p>
-                </div>
-                <div className="pt-1 flex items-center justify-between text-[10px]">
-                   <span className="font-bold">Net Prem: ₹43</span>
-                   <span className="text-bull font-bold">R:R 1:2.4</span>
-                </div>
-              </div>
-              <button className="w-full py-2 bg-primary text-white rounded-lg text-xs font-bold shadow-purple hover:bg-primary-dark transition-colors">
-                Quick Deploy Strategy
-              </button>
-            </CardContent>
-          </Card>
-
-          {/* Market Sentiment */}
-          <Card className="shadow-purple border-none bg-surface overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-headline font-bold uppercase tracking-wider">Market Sentiment</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="relative h-20 w-full flex items-center justify-center">
-                {/* Simplified Gauage mockup */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-32 h-16 rounded-t-full border-[10px] border-bull/20 border-b-0 relative">
-                     <div className="absolute top-0 right-0 w-16 h-16 rounded-t-full border-[10px] border-bull border-b-0 -rotate-[15deg] origin-bottom-center" />
-                  </div>
-                  <div className="absolute bottom-2 font-bold text-bull text-xs">72% GREED</div>
-                </div>
-              </div>
-              <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-muted-foreground uppercase">PCR</span>
-                  <span className="mono-font text-bull">1.28</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-muted-foreground uppercase">INDIA VIX</span>
-                  <span className="mono-font text-bear">13.42</span>
-                </div>
-                <div className="flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-muted-foreground uppercase">MAX PAIN</span>
-                  <span className="mono-font">22,400</span>
-                </div>
+              <div className="flex items-center justify-between text-[11px] font-bold">
+                <span className="text-muted-foreground uppercase">INDIA VIX</span>
+                <span className="mono-font text-bear">13.42</span>
               </div>
             </CardContent>
           </Card>

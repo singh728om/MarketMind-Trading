@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/top-bar";
 import { FloatingDigi } from "@/components/floating-digi";
 import { Toaster } from "@/components/ui/toaster";
+import { FirebaseClientProvider } from "@/firebase/client-provider";
 
 export const metadata: Metadata = {
   title: 'TheDigiOcean - India\'s Most Intelligent AI Trading Platform',
@@ -24,19 +25,21 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased bg-background text-foreground">
-        <SidebarProvider>
-          <div className="flex min-h-screen w-full flex-col">
-            <TopBar />
-            <div className="flex flex-1 overflow-hidden pt-16">
-              <AppSidebar />
-              <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-                {children}
-              </main>
+        <FirebaseClientProvider>
+          <SidebarProvider>
+            <div className="flex min-h-screen w-full flex-col">
+              <TopBar />
+              <div className="flex flex-1 overflow-hidden pt-16">
+                <AppSidebar />
+                <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+                  {children}
+                </main>
+              </div>
+              <FloatingDigi />
             </div>
-            <FloatingDigi />
-          </div>
-          <Toaster />
-        </SidebarProvider>
+            <Toaster />
+          </SidebarProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );

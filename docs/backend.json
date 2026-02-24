@@ -1,0 +1,1348 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user account on TheDigiOcean platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for login and communication.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "The full name of the user."
+        },
+        "phone": {
+          "type": "string",
+          "description": "The user's 10-digit Indian mobile number."
+        },
+        "plan": {
+          "type": "string",
+          "description": "The user's current subscription plan (e.g., Free, Trial, Pro, Algo/Quant)."
+        },
+        "trialEndsAt": {
+          "type": "string",
+          "description": "The timestamp when the user's trial period ends, if applicable.",
+          "format": "date-time"
+        },
+        "razorpayCustomerId": {
+          "type": "string",
+          "description": "The customer ID from Razorpay for billing purposes."
+        },
+        "credits": {
+          "type": "number",
+          "description": "The number of AI credits available to the user."
+        },
+        "experienceLevel": {
+          "type": "string",
+          "description": "The user's self-declared trading experience level (e.g., Beginner, Experienced)."
+        },
+        "riskProfile": {
+          "type": "string",
+          "description": "The user's self-declared risk tolerance profile (e.g., Conservative, Moderate, Aggressive)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was created.",
+          "format": "date-time"
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "Timestamp of the user's last login.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name",
+        "plan",
+        "credits",
+        "experienceLevel",
+        "riskProfile",
+        "createdAt"
+      ]
+    },
+    "UserSettings": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserSettings",
+      "type": "object",
+      "description": "Stores personalized settings for a user, including AI model preferences and UI configurations.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserSettings entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User associated with these settings. (Relationship: User 1:1 UserSettings)"
+        },
+        "primaryAiModel": {
+          "type": "string",
+          "description": "The primary AI model selected by the user for general analysis (e.g., Gemini 1.5 Pro)."
+        },
+        "geminiApiKeyEncrypted": {
+          "type": "string",
+          "description": "Encrypted API key for Google Gemini, if the user provides their own."
+        },
+        "openaiApiKeyEncrypted": {
+          "type": "string",
+          "description": "Encrypted API key for OpenAI (ChatGPT), if the user provides their own."
+        },
+        "claudeApiKeyEncrypted": {
+          "type": "string",
+          "description": "Encrypted API key for Anthropic Claude, if the user provides their own."
+        },
+        "languagePreference": {
+          "type": "string",
+          "description": "The preferred language for AI responses (e.g., English, Hinglish, Hindi)."
+        },
+        "analysisDepth": {
+          "type": "string",
+          "description": "Default depth for AI analysis (e.g., Quick, Detailed, Deep)."
+        },
+        "defaultChartTheme": {
+          "type": "string",
+          "description": "The user's preferred chart theme (e.g., Dark, Light, Auto)."
+        },
+        "defaultTimeframe": {
+          "type": "string",
+          "description": "The default timeframe for charts (e.g., 5m, 15m, 1h, 1D)."
+        },
+        "defaultTerminalLayout": {
+          "type": "string",
+          "description": "The default layout for the multi-chart terminal (e.g., Single, 4-Grid)."
+        },
+        "compactMode": {
+          "type": "boolean",
+          "description": "Indicates if compact UI mode is enabled."
+        },
+        "showMascot": {
+          "type": "boolean",
+          "description": "Indicates if the Digi mascot should be shown."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user settings were first created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user settings were last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "primaryAiModel",
+        "languagePreference",
+        "analysisDepth",
+        "defaultChartTheme",
+        "defaultTimeframe",
+        "defaultTerminalLayout",
+        "compactMode",
+        "showMascot",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RiskLimits": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RiskLimits",
+      "type": "object",
+      "description": "Defines the risk management limits and preferences set by a user for the AI Risk Guardian.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the RiskLimits entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User associated with these risk limits. (Relationship: User 1:1 RiskLimits)"
+        },
+        "dailyLossLimitInr": {
+          "type": "number",
+          "description": "Maximum INR amount a user is willing to lose in a single day."
+        },
+        "dailyLossLimitPct": {
+          "type": "number",
+          "description": "Maximum percentage of capital a user is willing to lose in a single day."
+        },
+        "perTradeMaxLoss": {
+          "type": "number",
+          "description": "Maximum INR loss allowed for a single trade."
+        },
+        "maxTradesPerDay": {
+          "type": "number",
+          "description": "Maximum number of trades allowed in a single day."
+        },
+        "maxConsecutiveLosses": {
+          "type": "number",
+          "description": "Number of consecutive losses before a risk intervention (e.g., lock)."
+        },
+        "consecutiveLossLock": {
+          "type": "boolean",
+          "description": "Indicates if auto-lock should be triggered after max consecutive losses."
+        },
+        "maxLotSizeFno": {
+          "type": "number",
+          "description": "Maximum F&O lot size allowed per trade."
+        },
+        "dailyProfitLock": {
+          "type": "number",
+          "description": "Optional daily profit target at which trading may be locked or restricted to protect gains."
+        },
+        "coolingPeriodMins": {
+          "type": "number",
+          "description": "Cooling-off period in minutes after a loss before placing a new trade."
+        },
+        "revengeSensitivity": {
+          "type": "string",
+          "description": "Sensitivity level for revenge trade detection (e.g., Low, Medium, High, Paranoid)."
+        },
+        "fomoBlockEnabled": {
+          "type": "boolean",
+          "description": "Enables blocking of trades identified as FOMO (Fear Of Missing Out)."
+        },
+        "greedProtectionEnabled": {
+          "type": "boolean",
+          "description": "Enables AI detection and intervention for greed-driven trading patterns."
+        },
+        "autoAlgoPause": {
+          "type": "boolean",
+          "description": "Indicates if active algorithms should be automatically paused when limits are hit."
+        },
+        "autoCancelPending": {
+          "type": "boolean",
+          "description": "Indicates if pending orders should be automatically cancelled when limits are hit."
+        },
+        "accountabilityPartnerName": {
+          "type": "string",
+          "description": "Name of the user's accountability partner, if configured."
+        },
+        "accountabilityPartnerContact": {
+          "type": "string",
+          "description": "Contact information (mobile/email) for the accountability partner."
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when these risk limits were last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "dailyLossLimitInr",
+        "dailyLossLimitPct",
+        "perTradeMaxLoss",
+        "maxTradesPerDay",
+        "maxConsecutiveLosses",
+        "consecutiveLossLock",
+        "maxLotSizeFno",
+        "coolingPeriodMins",
+        "revengeSensitivity",
+        "fomoBlockEnabled",
+        "greedProtectionEnabled",
+        "autoAlgoPause",
+        "autoCancelPending",
+        "updatedAt"
+      ]
+    },
+    "RiskIncident": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RiskIncident",
+      "type": "object",
+      "description": "Logs detected risk-related incidents (revenge, greed) by the AI Risk Guardian.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the RiskIncident entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User experiencing the incident. (Relationship: User 1:N RiskIncident)"
+        },
+        "incidentType": {
+          "type": "string",
+          "description": "The type of risk incident detected (e.g., Revenge Trade, Greed, Daily Loss Limit)."
+        },
+        "severityLevel": {
+          "type": "string",
+          "description": "The severity level of the incident (e.g., Gentle Nudge, Firm Warning, Strong Intervention, Auto-Lock)."
+        },
+        "triggerData": {
+          "type": "string",
+          "description": "JSON string containing raw data or signals that triggered the incident, for analysis."
+        },
+        "actionTaken": {
+          "type": "string",
+          "description": "The action taken by the AI Risk Guardian in response to the incident."
+        },
+        "pnlAtIncident": {
+          "type": "number",
+          "description": "The user's P&L at the time the incident occurred."
+        },
+        "tradesAtIncident": {
+          "type": "number",
+          "description": "Number of trades executed by the user at the time of the incident."
+        },
+        "overrideUsed": {
+          "type": "boolean",
+          "description": "Indicates if the user chose to override the AI's intervention."
+        },
+        "overrideReason": {
+          "type": "string",
+          "description": "The reason provided by the user for overriding the intervention, if applicable."
+        },
+        "preventedLossEstimate": {
+          "type": "number",
+          "description": "An estimated amount of loss prevented by the AI's intervention."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the risk incident was recorded.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "incidentType",
+        "severityLevel",
+        "actionTaken",
+        "pnlAtIncident",
+        "tradesAtIncident",
+        "overrideUsed",
+        "createdAt"
+      ]
+    },
+    "RiskLock": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "RiskLock",
+      "type": "object",
+      "description": "Records instances where trading was locked by the AI Risk Guardian.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the RiskLock entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User whose trading was locked. (Relationship: User 1:N RiskLock)"
+        },
+        "lockReason": {
+          "type": "string",
+          "description": "The primary reason for the trading lock (e.g., Daily Loss Limit Reached, Critical Revenge Pattern)."
+        },
+        "lockType": {
+          "type": "string",
+          "description": "The type of lock applied (e.g., Auto, Manual)."
+        },
+        "lockedAt": {
+          "type": "string",
+          "description": "Timestamp when trading was locked.",
+          "format": "date-time"
+        },
+        "unlockRequestedAt": {
+          "type": "string",
+          "description": "Timestamp when an unlock was requested, if applicable.",
+          "format": "date-time"
+        },
+        "unlockedAt": {
+          "type": "string",
+          "description": "Timestamp when trading was unlocked, if applicable.",
+          "format": "date-time"
+        },
+        "overrideEmailSent": {
+          "type": "boolean",
+          "description": "Indicates if an override email with OTP was sent."
+        },
+        "overrideEmailConfirmed": {
+          "type": "boolean",
+          "description": "Indicates if the override email OTP was successfully confirmed."
+        },
+        "pnlAtLock": {
+          "type": "number",
+          "description": "The user's P&L at the time of the lock."
+        },
+        "tradesAtLock": {
+          "type": "number",
+          "description": "Number of trades executed by the user at the time of the lock."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "lockReason",
+        "lockType",
+        "lockedAt",
+        "overrideEmailSent",
+        "overrideEmailConfirmed",
+        "pnlAtLock",
+        "tradesAtLock"
+      ]
+    },
+    "BrokerConnection": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BrokerConnection",
+      "type": "object",
+      "description": "Stores encrypted details and status of a user's connection to a trading broker.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the BrokerConnection entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who owns this broker connection. (Relationship: User 1:N BrokerConnection)"
+        },
+        "brokerName": {
+          "type": "string",
+          "description": "The name of the connected broker (e.g., Zerodha, Upstox)."
+        },
+        "apiKeyEncrypted": {
+          "type": "string",
+          "description": "Encrypted API key for the broker's API."
+        },
+        "apiSecretEncrypted": {
+          "type": "string",
+          "description": "Encrypted API secret for the broker's API."
+        },
+        "totpSecretEncrypted": {
+          "type": "string",
+          "description": "Encrypted TOTP secret for automatic session renewal, if applicable."
+        },
+        "accessTokenEncrypted": {
+          "type": "string",
+          "description": "Encrypted access token for the broker's API session."
+        },
+        "accountId": {
+          "type": "string",
+          "description": "The user's account ID at the connected broker."
+        },
+        "clientName": {
+          "type": "string",
+          "description": "The client name associated with the broker account."
+        },
+        "availableMargin": {
+          "type": "number",
+          "description": "The current available margin for trading in the broker account."
+        },
+        "fnoMargin": {
+          "type": "number",
+          "description": "The current available F&O margin in the broker account."
+        },
+        "status": {
+          "type": "string",
+          "description": "The connection status to the broker (e.g., Connected, Disconnected, Error)."
+        },
+        "isPrimary": {
+          "type": "boolean",
+          "description": "Indicates if this is the user's primary broker for order execution."
+        },
+        "permissions": {
+          "type": "string",
+          "description": "JSON string detailing the permissions granted for this broker connection (e.g., read positions, place orders)."
+        },
+        "connectedAt": {
+          "type": "string",
+          "description": "Timestamp when the broker connection was first established.",
+          "format": "date-time"
+        },
+        "lastRefreshed": {
+          "type": "string",
+          "description": "Timestamp when the broker token/session was last refreshed.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "brokerName",
+        "status",
+        "isPrimary",
+        "connectedAt"
+      ]
+    },
+    "Watchlist": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Watchlist",
+      "type": "object",
+      "description": "Represents a user-defined watchlist of financial symbols.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Watchlist entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who owns this watchlist. (Relationship: User 1:N Watchlist)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the watchlist (e.g., 'My Favourites', 'Intraday Picks')."
+        },
+        "symbols": {
+          "type": "array",
+          "description": "An array of symbols (e.g., 'NIFTY50', 'RELIANCE.NSE') in the watchlist.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the watchlist was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "symbols",
+        "createdAt"
+      ]
+    },
+    "Trade": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Trade",
+      "type": "object",
+      "description": "Records details of a single trade executed by the user, including P&L and behavioral tags.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Trade entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who executed this trade. (Relationship: User 1:N Trade)"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "The trading symbol of the instrument (e.g., 'NIFTY50', 'RELIANCE.NSE')."
+        },
+        "exchange": {
+          "type": "string",
+          "description": "The exchange where the trade was executed (e.g., 'NSE', 'BSE')."
+        },
+        "segment": {
+          "type": "string",
+          "description": "The market segment of the trade (e.g., 'EQUITY', 'FUTURES', 'OPTIONS')."
+        },
+        "side": {
+          "type": "string",
+          "description": "The side of the trade (e.g., 'BUY', 'SELL')."
+        },
+        "qty": {
+          "type": "number",
+          "description": "The quantity or number of lots traded."
+        },
+        "entryPrice": {
+          "type": "number",
+          "description": "The average entry price of the trade."
+        },
+        "exitPrice": {
+          "type": "number",
+          "description": "The average exit price of the trade. Null if the position is still open."
+        },
+        "pnl": {
+          "type": "number",
+          "description": "The absolute Profit and Loss for the trade."
+        },
+        "pnlPct": {
+          "type": "number",
+          "description": "The percentage Profit and Loss for the trade."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the trade (e.g., 'OPEN', 'CLOSED', 'PENDING', 'CANCELLED', 'PARTIAL_CLOSED')."
+        },
+        "strategyId": {
+          "type": "string",
+          "description": "Reference to the Strategy that this trade belongs to, if any. (Relationship: Strategy 1:N Trade)"
+        },
+        "algoId": {
+          "type": "string",
+          "description": "Reference to the Algo that executed this trade, if any. (Relationship: Algo 1:N Trade)"
+        },
+        "brokerOrderId": {
+          "type": "string",
+          "description": "The unique order ID provided by the broker for this trade."
+        },
+        "openedAt": {
+          "type": "string",
+          "description": "Timestamp when the trade position was opened.",
+          "format": "date-time"
+        },
+        "closedAt": {
+          "type": "string",
+          "description": "Timestamp when the trade position was closed. Null if the position is still open.",
+          "format": "date-time"
+        },
+        "preTradePlan": {
+          "type": "string",
+          "description": "User's notes on the plan or reasoning before taking the trade."
+        },
+        "postTradeReview": {
+          "type": "string",
+          "description": "User's notes on what happened and lessons learned after the trade."
+        },
+        "emotionTag": {
+          "type": "string",
+          "description": "User-tagged emotion or AI-detected emotion for the trade (e.g., 'Disciplined', 'FOMO', 'Revenge')."
+        },
+        "setupQuality": {
+          "type": "number",
+          "description": "User-rated quality of the trade setup, typically on a scale (e.g., 1-5 stars)."
+        },
+        "followedRules": {
+          "type": "string",
+          "description": "Indicates if the user followed their trading rules (e.g., 'Yes', 'Partially', 'No')."
+        },
+        "revengeTradeFlag": {
+          "type": "boolean",
+          "description": "Flag indicating if this trade was identified as a revenge trade by AI or user."
+        },
+        "revengeTradeScore": {
+          "type": "number",
+          "description": "A score indicating the probability or intensity of revenge trading for this trade."
+        },
+        "geminiReview": {
+          "type": "string",
+          "description": "Gemini AI's automated review and analysis of the trade based on historical data."
+        },
+        "tags": {
+          "type": "array",
+          "description": "An array of custom tags associated with the trade.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "symbol",
+        "exchange",
+        "segment",
+        "side",
+        "qty",
+        "entryPrice",
+        "status",
+        "brokerOrderId",
+        "openedAt"
+      ]
+    },
+    "Signal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Signal",
+      "type": "object",
+      "description": "Represents a trading signal generated by the AI for a specific instrument.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Signal entity."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "The trading symbol to which the signal applies."
+        },
+        "exchange": {
+          "type": "string",
+          "description": "The exchange where the instrument is traded."
+        },
+        "segment": {
+          "type": "string",
+          "description": "The market segment of the instrument (e.g., EQUITY, FUTURES, OPTIONS)."
+        },
+        "direction": {
+          "type": "string",
+          "description": "The suggested trade direction (e.g., BUY, SELL, NEUTRAL)."
+        },
+        "entryLow": {
+          "type": "number",
+          "description": "The lower bound of the recommended entry price range."
+        },
+        "entryHigh": {
+          "type": "number",
+          "description": "The upper bound of the recommended entry price range."
+        },
+        "target1": {
+          "type": "number",
+          "description": "The first target price for the trade."
+        },
+        "target2": {
+          "type": "number",
+          "description": "The second target price for the trade."
+        },
+        "target3": {
+          "type": "number",
+          "description": "The third target price for the trade."
+        },
+        "stoploss": {
+          "type": "number",
+          "description": "The recommended stop loss price for the trade."
+        },
+        "rrRatio": {
+          "type": "number",
+          "description": "The Risk-Reward ratio of the suggested trade."
+        },
+        "confidence": {
+          "type": "number",
+          "description": "The confidence level (in percentage) of the AI in this signal."
+        },
+        "signalType": {
+          "type": "string",
+          "description": "The type of signal generated (e.g., Breakout, VWAP, Reversal, F&O Setup)."
+        },
+        "timeframe": {
+          "type": "string",
+          "description": "The timeframe for which the signal is valid (e.g., Intraday, Swing, Positional)."
+        },
+        "basisTags": {
+          "type": "array",
+          "description": "An array of strings indicating the analytical basis for the signal (e.g., 'Technical', 'FII Buying', 'Option Chain').",
+          "items": {
+            "type": "string"
+          }
+        },
+        "geminiNarrative": {
+          "type": "string",
+          "description": "A brief narrative explanation of the signal from Gemini AI."
+        },
+        "fiiConfirmation": {
+          "type": "boolean",
+          "description": "Indicates if the signal is confirmed by FII data."
+        },
+        "vixAtSignal": {
+          "type": "number",
+          "description": "The India VIX value at the time the signal was generated."
+        },
+        "firedAt": {
+          "type": "string",
+          "description": "Timestamp when the signal was generated/fired.",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "description": "Timestamp until which the signal is considered valid.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the signal (e.g., 'ACTIVE', 'EXPIRED', 'EXECUTED')."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "The outcome of the signal if acted upon (e.g., 'PROFIT', 'LOSS', 'BREAKEVEEN')."
+        },
+        "aiModelUsed": {
+          "type": "string",
+          "description": "The specific AI model used to generate this signal."
+        }
+      },
+      "required": [
+        "id",
+        "symbol",
+        "exchange",
+        "segment",
+        "direction",
+        "entryLow",
+        "entryHigh",
+        "target1",
+        "stoploss",
+        "rrRatio",
+        "confidence",
+        "signalType",
+        "timeframe",
+        "basisTags",
+        "geminiNarrative",
+        "firedAt",
+        "validUntil",
+        "status",
+        "aiModelUsed"
+      ]
+    },
+    "Algo": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Algo",
+      "type": "object",
+      "description": "Defines a user's automated trading strategy or algorithm.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Algo entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who created this algorithm. (Relationship: User 1:N Algo)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the trading algorithm."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of what the algorithm does."
+        },
+        "code": {
+          "type": "string",
+          "description": "The Python code or script defining the algorithm logic."
+        },
+        "visualConfig": {
+          "type": "string",
+          "description": "JSON string representing the configuration from the visual algo builder."
+        },
+        "riskConfig": {
+          "type": "string",
+          "description": "JSON string containing algorithm-specific risk parameters and rules."
+        },
+        "status": {
+          "type": "string",
+          "description": "The deployment status of the algorithm (e.g., 'Deployed', 'Paused', 'Draft', 'Error')."
+        },
+        "mode": {
+          "type": "string",
+          "description": "The execution mode of the algorithm (e.g., 'Live', 'Paper')."
+        },
+        "brokerId": {
+          "type": "string",
+          "description": "Reference to the BrokerConnection used by this algorithm. (Relationship: BrokerConnection 1:N Algo)"
+        },
+        "capitalAllocated": {
+          "type": "number",
+          "description": "The capital allocated for this specific algorithm."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the algorithm was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the algorithm was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "code",
+        "riskConfig",
+        "status",
+        "mode",
+        "brokerId",
+        "capitalAllocated",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BacktestRun": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BacktestRun",
+      "type": "object",
+      "description": "Stores the results and configuration of a backtesting run for an algorithm.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the BacktestRun entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who initiated the backtest. (Relationship: User 1:N BacktestRun)"
+        },
+        "algoId": {
+          "type": "string",
+          "description": "Reference to the Algo that was backtested. (Relationship: Algo 1:N BacktestRun)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The start date of the backtesting period.",
+          "format": "date"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The end date of the backtesting period.",
+          "format": "date"
+        },
+        "capital": {
+          "type": "number",
+          "description": "The initial capital used for the backtest."
+        },
+        "universe": {
+          "type": "string",
+          "description": "The market universe or symbols included in the backtest."
+        },
+        "results": {
+          "type": "string",
+          "description": "JSON string containing the detailed results and metrics of the backtest."
+        },
+        "geminiCritique": {
+          "type": "string",
+          "description": "Gemini AI's critique and suggestions based on the backtest results."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the backtest run was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "algoId",
+        "startDate",
+        "endDate",
+        "capital",
+        "results",
+        "createdAt"
+      ]
+    },
+    "FiiDiiData": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FiiDiiData",
+      "type": "object",
+      "description": "Aggregates daily FII/DII (Foreign/Domestic Institutional Investor) activity data.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the FiiDiiData entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the FII/DII data is recorded.",
+          "format": "date"
+        },
+        "fiiCashNet": {
+          "type": "number",
+          "description": "Net cash activity by Foreign Institutional Investors (FIIs) in crores."
+        },
+        "fiiFuturesNet": {
+          "type": "number",
+          "description": "Net futures activity by FIIs in crores."
+        },
+        "fiiOptionsNet": {
+          "type": "number",
+          "description": "Net options activity by FIIs in crores."
+        },
+        "diiNet": {
+          "type": "number",
+          "description": "Net activity by Domestic Institutional Investors (DIIs) in crores."
+        },
+        "mfNet": {
+          "type": "number",
+          "description": "Net activity by Mutual Funds (MFs) in crores."
+        },
+        "insuranceNet": {
+          "type": "number",
+          "description": "Net activity by Insurance companies in crores."
+        },
+        "fiiFuturesLong": {
+          "type": "number",
+          "description": "Total long positions in index futures by FIIs."
+        },
+        "fiiFuturesShort": {
+          "type": "number",
+          "description": "Total short positions in index futures by FIIs."
+        },
+        "consecutiveBuyingDays": {
+          "type": "number",
+          "description": "Number of consecutive days FIIs have been net buyers."
+        },
+        "consecutiveSellingDays": {
+          "type": "number",
+          "description": "Number of consecutive days FIIs have been net sellers."
+        },
+        "source": {
+          "type": "string",
+          "description": "The source of the FII/DII data (e.g., 'SEBI')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this data record was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "fiiCashNet",
+        "fiiFuturesNet",
+        "fiiOptionsNet",
+        "diiNet",
+        "mfNet",
+        "insuranceNet",
+        "fiiFuturesLong",
+        "fiiFuturesShort",
+        "consecutiveBuyingDays",
+        "consecutiveSellingDays",
+        "source",
+        "createdAt"
+      ]
+    },
+    "SignalsPerformance": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SignalsPerformance",
+      "type": "object",
+      "description": "Tracks the performance metrics of AI-generated signals over time.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SignalsPerformance entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the signal performance is recorded.",
+          "format": "date"
+        },
+        "totalSignals": {
+          "type": "number",
+          "description": "The total number of signals generated on this date."
+        },
+        "equityWinRate": {
+          "type": "number",
+          "description": "The win rate percentage for equity signals on this date."
+        },
+        "fnoWinRate": {
+          "type": "number",
+          "description": "The win rate percentage for F&O signals on this date."
+        },
+        "avgRr": {
+          "type": "number",
+          "description": "The average Risk-Reward ratio across all signals for this date."
+        },
+        "avgConfidence": {
+          "type": "number",
+          "description": "The average confidence level of signals generated on this date."
+        },
+        "aiModel": {
+          "type": "string",
+          "description": "The AI model that generated these signals."
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "totalSignals",
+        "equityWinRate",
+        "fnoWinRate",
+        "avgRr",
+        "avgConfidence",
+        "aiModel"
+      ]
+    },
+    "Portfolio": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Portfolio",
+      "type": "object",
+      "description": "Represents a user's overall portfolio holdings, including a summary of positions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Portfolio entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who owns this portfolio. (Relationship: User 1:N Portfolio)"
+        },
+        "holdings": {
+          "type": "string",
+          "description": "JSON string containing details of all current holdings (e.g., symbol, quantity, average price, current market price, unrealized P&L)."
+        },
+        "brokerId": {
+          "type": "string",
+          "description": "Reference to the primary BrokerConnection from which this portfolio data is synced. (Relationship: BrokerConnection 1:N Portfolio)"
+        },
+        "syncedAt": {
+          "type": "string",
+          "description": "Timestamp when the portfolio holdings were last synced with the broker.",
+          "format": "date-time"
+        },
+        "xirr": {
+          "type": "number",
+          "description": "The XIRR (Extended Internal Rate of Return) of the portfolio."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "holdings",
+        "brokerId",
+        "syncedAt"
+      ]
+    },
+    "AgentSession": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AgentSession",
+      "type": "object",
+      "description": "Logs conversational interactions with the Digi AI Trading Agent.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AgentSession entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User participating in the session. (Relationship: User 1:N AgentSession)"
+        },
+        "messages": {
+          "type": "string",
+          "description": "JSON string containing the array of message objects in the conversation (e.g., [{role: 'user', content: '...'}])."
+        },
+        "aiModelsUsed": {
+          "type": "array",
+          "description": "An array of strings listing the AI models consulted during the session.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the agent session was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the agent session was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "messages",
+        "aiModelsUsed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "BillingInvoice": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "BillingInvoice",
+      "type": "object",
+      "description": "Records details of billing invoices for user subscriptions or credit purchases.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the BillingInvoice entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User to whom the invoice belongs. (Relationship: User 1:N BillingInvoice)"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The total amount of the invoice."
+        },
+        "plan": {
+          "type": "string",
+          "description": "The subscription plan or item for which the invoice was generated."
+        },
+        "razorpayPaymentId": {
+          "type": "string",
+          "description": "The payment ID from Razorpay for this invoice."
+        },
+        "paidAt": {
+          "type": "string",
+          "description": "Timestamp when the invoice was paid.",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the invoice was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "amount",
+        "plan",
+        "razorpayPaymentId",
+        "paidAt",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Top-level collection for user profiles. The document ID `{userId}` matches the user's authentication UID. Includes user plan, credits, and profile details."
+        }
+      },
+      {
+        "path": "/users/{userId}/settings/{userSettingsId}",
+        "definition": {
+          "entityName": "UserSettings",
+          "schema": {
+            "$ref": "#/backend/entities/UserSettings"
+          },
+          "description": "Subcollection for user-specific settings. The document ID `{userSettingsId}` typically matches the `userId` or a default identifier. Includes denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/risk_limits/{riskLimitsId}",
+        "definition": {
+          "entityName": "RiskLimits",
+          "schema": {
+            "$ref": "#/backend/entities/RiskLimits"
+          },
+          "description": "Subcollection storing a user's risk management limits and preferences. The document ID `{riskLimitsId}` typically matches the `userId` or a default identifier. Includes denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/risk_incidents/{riskIncidentId}",
+        "definition": {
+          "entityName": "RiskIncident",
+          "schema": {
+            "$ref": "#/backend/entities/RiskIncident"
+          },
+          "description": "Subcollection logging detected risk-related incidents for a user. Each incident document includes the denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/risk_locks/{riskLockId}",
+        "definition": {
+          "entityName": "RiskLock",
+          "schema": {
+            "$ref": "#/backend/entities/RiskLock"
+          },
+          "description": "Subcollection recording instances where a user's trading was locked by the AI Risk Guardian. Each lock document includes the denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/broker_connections/{brokerConnectionId}",
+        "definition": {
+          "entityName": "BrokerConnection",
+          "schema": {
+            "$ref": "#/backend/entities/BrokerConnection"
+          },
+          "description": "Subcollection storing encrypted details and status of a user's connections to trading brokers. Each connection document includes the denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/watchlists/{watchlistId}",
+        "definition": {
+          "entityName": "Watchlist",
+          "schema": {
+            "$ref": "#/backend/entities/Watchlist"
+          },
+          "description": "Subcollection for user-defined watchlists of financial symbols. Each watchlist document includes the denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/trades/{tradeId}",
+        "definition": {
+          "entityName": "Trade",
+          "schema": {
+            "$ref": "#/backend/entities/Trade"
+          },
+          "description": "Subcollection recording details of individual trades executed by the user. Includes denormalized 'userId' for authorization independence. Supports querying for open positions via `status: 'OPEN'`."
+        }
+      },
+      {
+        "path": "/signals/{signalId}",
+        "definition": {
+          "entityName": "Signal",
+          "schema": {
+            "$ref": "#/backend/entities/Signal"
+          },
+          "description": "Top-level collection for AI-generated trading signals. This data is public/platform-wide and accessible based on subscription plan, not user ownership. No 'userId' needed as it's not user-owned."
+        }
+      },
+      {
+        "path": "/users/{userId}/algos/{algoId}",
+        "definition": {
+          "entityName": "Algo",
+          "schema": {
+            "$ref": "#/backend/entities/Algo"
+          },
+          "description": "Subcollection defining a user's automated trading strategies (algorithms). Includes denormalized 'userId' for authorization independence. Supports querying for active algos via `status: 'Deployed'`."
+        }
+      },
+      {
+        "path": "/users/{userId}/backtest_runs/{backtestRunId}",
+        "definition": {
+          "entityName": "BacktestRun",
+          "schema": {
+            "$ref": "#/backend/entities/BacktestRun"
+          },
+          "description": "Subcollection storing results and configurations of backtesting runs for user's algorithms. Each run document includes the denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/fii_dii_data/{fiiDiiDataId}",
+        "definition": {
+          "entityName": "FiiDiiData",
+          "schema": {
+            "$ref": "#/backend/entities/FiiDiiData"
+          },
+          "description": "Top-level collection for aggregated daily FII/DII activity data. This data is public/platform-wide. Document ID `{fiiDiiDataId}` typically represents the date (e.g., 'YYYY-MM-DD'). No 'userId' needed as it's not user-owned."
+        }
+      },
+      {
+        "path": "/signals_performance/{signalsPerformanceId}",
+        "definition": {
+          "entityName": "SignalsPerformance",
+          "schema": {
+            "$ref": "#/backend/entities/SignalsPerformance"
+          },
+          "description": "Top-level collection tracking the performance metrics of AI-generated signals over time. This data is public/platform-wide. Document ID `{signalsPerformanceId}` typically represents the date or AI model. No 'userId' needed as it's not user-owned."
+        }
+      },
+      {
+        "path": "/users/{userId}/portfolios/{portfolioId}",
+        "definition": {
+          "entityName": "Portfolio",
+          "schema": {
+            "$ref": "#/backend/entities/Portfolio"
+          },
+          "description": "Subcollection representing a user's overall portfolio holdings. The document ID `{portfolioId}` typically matches the `userId` or a default identifier. Includes denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/agent_sessions/{agentSessionId}",
+        "definition": {
+          "entityName": "AgentSession",
+          "schema": {
+            "$ref": "#/backend/entities/AgentSession"
+          },
+          "description": "Subcollection logging conversational interactions with the Digi AI Trading Agent for a user. Each session document includes the denormalized 'userId' for authorization independence."
+        }
+      },
+      {
+        "path": "/users/{userId}/billing_invoices/{billingInvoiceId}",
+        "definition": {
+          "entityName": "BillingInvoice",
+          "schema": {
+            "$ref": "#/backend/entities/BillingInvoice"
+          },
+          "description": "Subcollection recording details of billing invoices for a user. Each invoice document includes the denormalized 'userId' for authorization independence."
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure prioritizes Authorization Independence and Structural Segregation to ensure robust security and debuggability. All user-specific data is housed within a dedicated subcollection under `/users/{userId}/`, where `{userId}` is a path parameter matching `request.auth.uid`. Each document in these subcollections explicitly includes a `userId` field, denormalizing the authorization context. This eliminates the need for `get()` calls in security rules, making rules simpler (e.g., `allow read: if request.auth.uid == userId && request.auth.uid == resource.data.userId;`). This also enables atomic operations like creating a user and their initial settings or risk limits in a single batch, without complex rule dependencies. For example, a new `Trade` document will be created under `/users/{userId}/trades/{tradeId}` and will contain `trade.userId`, allowing rules to verify ownership directly. Public or platform-wide data, such as AI-generated `Signals`, `FiiDiiData`, and `SignalsPerformance`, resides in top-level collections. This structural segregation ensures that `list` operations on these collections (which are not owned by a specific user) do not inadvertently expose private user data and allows for efficient, public-facing queries. For instance, a query for open positions on the dashboard would simply be `firestore.collection('users').doc(request.auth.uid).collection('trades').where('status', '==', 'OPEN')`, directly leveraging the `userId` path parameter for security. Similarly, active algorithms are found by querying `firestore.collection('users').doc(request.auth.uid).collection('algos').where('status', '==', 'Deployed')` and available funds from the primary `BrokerConnection` for the authenticated user. This design inherently supports Querying All Possibilities (QAPs) by ensuring that security rules are not filters; instead, the data structure itself enforces the security posture, allowing the platform to fetch exactly what the user is authorized to see with a single, permissioned query."
+  }
+}

@@ -1,0 +1,241 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * THE DIGIOCEAN SECURITY RULES
+     *
+     * Core Philosophy:
+     * This ruleset implements a strict user-ownership model combined with platform-wide public 
+     * data access. Authorization is primarily driven by the hierarchical path /users/{userId}, 
+     * where {userId} corresponds directly to the Firebase Authentication UID.
+     *
+     * Data Structure:
+     * - Private User Data: All personal trading data (trades, algos, settings, risk limits) 
+     *   is nested under the /users/{userId} path.
+     * - Public Platform Data: Market signals, FII/DII data, and aggregate performance metrics 
+     *   are stored in top-level collections for global readability.
+     *
+     * Key Security Decisions:
+     * 1. Authorization Independence: Every document in a user subcollection contains a denormalized 
+     *    'userId' field. Rules verify that the path userId matches both the authenticated UID 
+     *    and the internal document userId.
+     * 2. Prototyping Flexibility: While ownership is strictly enforced, data types and 
+     *    general object shapes are not validated to allow for rapid UI/UX iteration.
+     * 3. Read-Only Public Data: Collections like /signals and /fii_dii_data are readable by 
+     *    all but can only be modified by system-level processes (not client SDKs).
+     * 4. State Protection: For user trades and algos, the 'userId' field is treated as immutable 
+     *    to prevent data from being moved between accounts.
+     */
+
+    // --- Helper Functions ---
+
+    /** @description Checks if the user is authenticated with Firebase. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** @description Checks if the authenticated user's UID matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** @description Verifies ownership and ensures the document exists for updates or deletions. */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /** @description Enforces relational integrity between the path and the document's internal userId field. */
+    function matchesPath(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /** @description Prevents the userId field from being changed after a document is created. */
+    function userIdImmutable() {
+      return request.resource.data.userId == resource.data.userId;
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for the top-level user profile.
+     * @path /users/{userId}
+     * @allow (get, list, create) if auth.uid == userId.
+     * @deny (write) if auth.uid != userId.
+     * @principle Ownership: Users manage their own profile and cannot view others.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update, delete: if isExistingOwner(userId);
+
+      /**
+       * @description User settings for AI preferences and UI configuration.
+       * @path /users/{userId}/settings/{id}
+       * @allow (create) if path userId and data userId match auth.uid.
+       * @principle Relational Integrity: Ensures settings are linked to the correct user.
+       */
+      match /settings/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Risk management limits (daily loss, max trades).
+       * @path /users/{userId}/risk_limits/{id}
+       * @allow (update) if is owner and userId is not modified.
+       */
+      match /risk_limits/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Logs of risk-related incidents (e.g., revenge trading detections).
+       * @path /users/{userId}/risk_incidents/{id}
+       */
+      match /risk_incidents/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Records of trading locks enforced by the Risk Guardian.
+       * @path /users/{userId}/risk_locks/{id}
+       */
+      match /risk_locks/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Encrypted broker API credentials and connection status.
+       * @path /users/{userId}/broker_connections/{id}
+       */
+      match /broker_connections/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description User-defined watchlists of market symbols.
+       * @path /users/{userId}/watchlists/{id}
+       */
+      match /watchlists/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Records of executed trades. Supports queries for open positions.
+       * @path /users/{userId}/trades/{id}
+       * @allow (list) by owner to populate the dashboard.
+       * @principle Relational Integrity: Validates that trades cannot be reassigned to other users.
+       */
+      match /trades/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Automated trading strategies (Algos).
+       * @path /users/{userId}/algos/{id}
+       */
+      match /algos/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description Results of algorithm backtesting.
+       * @path /users/{userId}/backtest_runs/{id}
+       */
+      match /backtest_runs/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description User's consolidated portfolio holdings.
+       * @path /users/{userId}/portfolios/{id}
+       */
+      match /portfolios/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description History of AI chat sessions.
+       * @path /users/{userId}/agent_sessions/{id}
+       */
+      match /agent_sessions/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+
+      /**
+       * @description User billing history and invoices.
+       * @path /users/{userId}/billing_invoices/{id}
+       */
+      match /billing_invoices/{id} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && matchesPath(userId);
+        allow update: if isExistingOwner(userId) && userIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description AI-generated trading signals available to all platform users.
+     * @path /signals/{signalId}
+     * @allow (get, list) for any signed-in user.
+     * @deny (write) Restricted to system/admin level.
+     */
+    match /signals/{signalId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Daily institutional investor (FII/DII) activity data.
+     * @path /fii_dii_data/{id}
+     * @allow (get, list) publicly readable by authenticated users.
+     */
+    match /fii_dii_data/{id} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+    /**
+     * @description Historical performance metrics for platform signals.
+     * @path /signals_performance/{id}
+     */
+    match /signals_performance/{id} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+  }
+}

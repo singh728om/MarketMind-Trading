@@ -41,6 +41,7 @@ const AVAILABLE_SYMBOLS = [
 ];
 
 // Moving sub-component outside to prevent remounting on parent state change
+// This prevents the "Reset to Apple" behavior by keeping the component instance stable
 const ChartWindow = React.memo(({ 
   index, 
   symbol, 
@@ -57,8 +58,8 @@ const ChartWindow = React.memo(({
           value={symbol} 
           onValueChange={(val) => onSymbolChange(index, val)}
         >
-          <SelectTrigger className="h-7 w-32 bg-background/80 backdrop-blur-sm border-none shadow-sm text-[10px] font-bold uppercase focus:ring-1 focus:ring-primary/30">
-            <SelectValue placeholder="Symbol" />
+          <SelectTrigger className="h-7 w-36 bg-background/90 backdrop-blur-sm border-muted shadow-sm text-[10px] font-bold uppercase focus:ring-1 focus:ring-primary/30">
+            <SelectValue placeholder="Select Symbol" />
           </SelectTrigger>
           <SelectContent>
             {AVAILABLE_SYMBOLS.map(s => (

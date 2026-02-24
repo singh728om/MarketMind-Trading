@@ -6,6 +6,7 @@ import { Shield, Bell, CreditCard, ChevronDown, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 const indices = [
   { name: 'NIFTY 50', value: '22,450.30', change: '+125.40', pct: '+0.56%', trend: 'up' },
@@ -25,9 +26,10 @@ export function TopBar() {
   }, []);
 
   return (
-    <header className="fixed top-0 z-50 h-16 w-full border-b bg-surface shadow-sm px-4 flex items-center justify-between">
+    <header className="fixed top-0 z-50 h-16 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm px-4 flex items-center justify-between">
       {/* Left Area: Logo and Market Status */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
+        <SidebarTrigger className="text-muted-foreground hover:text-primary" />
         <Link href="/" className="flex items-center gap-2 group">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-xl shadow-purple transition-transform group-hover:scale-110">D</div>
           <span className="text-xl font-headline font-bold text-primary hidden md:block">TheDigiOcean</span>
@@ -75,7 +77,7 @@ export function TopBar() {
             <span className="absolute top-1 right-1 w-2 h-2 bg-bear rounded-full" />
           </button>
           
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-primary-light text-primary rounded-lg border border-primary/10">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg border border-primary/10">
             <CreditCard className="w-4 h-4" />
             <span className="mono-font text-xs font-bold">842 cr</span>
           </div>

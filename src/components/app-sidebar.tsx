@@ -8,7 +8,7 @@ import {
   ShieldAlert, BookOpen, UserCircle, Briefcase, FileText, 
   Settings, CreditCard, PieChart, Activity, Globe,
   ShieldCheck, AlertTriangle, HelpCircle, LogOut, Search,
-  ChevronRight, BrainCircuit, Bot, Radio, Boxes, History
+  ChevronRight, BrainCircuit, Bot, Radio, Boxes, History, Plus
 } from 'lucide-react';
 import { 
   Sidebar, 
@@ -24,14 +24,13 @@ import {
   SidebarSeparator
 } from "@/components/ui/sidebar";
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 
 const navItems = [
   {
     label: "TRADING",
     items: [
-      { label: "Dashboard", icon: Home, href: "/dashboard" },
+      { label: "Dashboard", icon: Home, href: "/" },
       { label: "Live Market", icon: Globe, href: "/market" },
       { label: "Terminal", icon: Monitor, href: "/terminal" },
       { label: "Intraday Cockpit", icon: Zap, href: "/intraday" },
@@ -83,18 +82,14 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r bg-sidebar">
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-9 w-9 border-2 border-primary/20">
-            <AvatarImage src="https://picsum.photos/seed/user-sidebar/40/40" />
-            <AvatarFallback>AK</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-bold truncate">Ajay Kumar</span>
-            <div className="flex items-center gap-1 mt-0.5">
-              <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-gold/10 text-gold border-gold/20">PRO PLAN</Badge>
-            </div>
-          </div>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" className="bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all shadow-sm">
+              <Plus className="w-5 h-5" />
+              <span className="font-bold">New Trade</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       
       <SidebarContent>
@@ -130,16 +125,16 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-4">
         <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 group-data-[collapsible=icon]:hidden">
           <p className="text-[10px] font-bold text-primary mb-2 uppercase tracking-tight">Upgrade Your Game</p>
           <p className="text-[11px] text-muted-foreground leading-tight mb-3">Unlock Live Algo Trading with Pro access.</p>
-          <Button variant="default" size="sm" className="w-full bg-primary hover:bg-primary-dark text-white text-[11px] h-8 font-bold shadow-purple">
+          <Button variant="default" size="sm" className="w-full bg-primary hover:bg-primary/90 text-white text-[11px] h-8 font-bold shadow-purple">
             Get Pro Access <ChevronRight className="w-3 h-3 ml-1" />
           </Button>
         </div>
         
-        <SidebarMenu className="mt-2">
+        <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton className="text-bear hover:bg-bear/10 hover:text-bear">
               <LogOut className="w-4 h-4" />
@@ -150,8 +145,4 @@ export function AppSidebar() {
       </SidebarFooter>
     </Sidebar>
   );
-}
-
-function Button({ className, ...props }: any) {
-  return <button className={cn("inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50", className)} {...props} />;
 }

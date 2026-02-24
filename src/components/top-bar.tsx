@@ -1,11 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Shield, Bell, CreditCard, ChevronDown, User } from 'lucide-react';
+import { Shield, Bell, CreditCard, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
 const indices = [
@@ -18,9 +17,11 @@ const indices = [
 ];
 
 export function TopBar() {
-  const [time, setTime] = React.useState(new Date());
+  const [time, setTime] = useState<Date | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    // Set initial time on client side mount
+    setTime(new Date());
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -67,7 +68,7 @@ export function TopBar() {
             Protected
           </div>
           <span className="mono-font text-[10px] text-muted-foreground mt-0.5">
-            {time.toLocaleTimeString('en-IN', { hour12: true })} IST
+            {time ? time.toLocaleTimeString('en-IN', { hour12: true }) : '--:--:--'} IST
           </span>
         </div>
 

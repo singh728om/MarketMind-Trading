@@ -1,10 +1,12 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, Zap, Activity, Radio, TrendingUp, 
   Sparkles, BrainCircuit, Eye, XCircle, 
-  ShoppingCart, ChevronRight, ChevronLeft
+  ShoppingCart, ChevronRight, ChevronLeft,
+  ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -48,32 +50,71 @@ const FO_STRATEGIES = [
     confidence: 76,
     direction: 'SELL',
     entryPrice: 48200
-  },
+  }
+];
+
+const AI_RECOMMENDED_SIGNALS = [
+  // Stock Signals
   {
-    id: 'finnifty-iron-condor',
-    symbol: 'FINNIFTY',
-    name: 'Short Iron Condor',
-    expiry: '25 MAR',
-    badge: 'FINNIFTY MONTHLY',
-    description: 'Range-bound expectation between 21,200 and 21,800. Low VIX favors credit spreads.',
-    maxProfit: '₹5,600',
-    maxLoss: '₹2,400',
-    confidence: 91,
-    direction: 'BUY',
-    entryPrice: 21500
-  },
-  {
-    id: 'reliance-long-straddle',
+    id: 'sig-rel',
     symbol: 'RELIANCE',
-    name: 'Long Straddle',
-    expiry: '28 MAR',
-    badge: 'EQUITY F&O',
-    description: 'Impending breakout from 2,950 consolidation zone. High volume expected post-results.',
-    maxProfit: 'Unlimited',
-    maxLoss: '₹9,100',
-    confidence: 68,
+    segment: 'EQUITY',
     direction: 'BUY',
-    entryPrice: 2980
+    type: 'Breakout',
+    entry: 2950.40,
+    target: 3020.00,
+    stoploss: 2910.00,
+    confidence: 88,
+    qty: 10
+  },
+  {
+    id: 'sig-tcs',
+    symbol: 'TCS',
+    segment: 'EQUITY',
+    direction: 'BUY',
+    type: 'VWAP Reversal',
+    entry: 4120.00,
+    target: 4200.00,
+    stoploss: 4080.00,
+    confidence: 82,
+    qty: 5
+  },
+  // F&O Signals
+  {
+    id: 'sig-nifty-ce',
+    symbol: 'NIFTY 22500 CE',
+    segment: 'F&O',
+    direction: 'BUY',
+    type: 'Option Scalp',
+    entry: 145.20,
+    target: 185.00,
+    stoploss: 120.00,
+    confidence: 91,
+    qty: 50
+  },
+  {
+    id: 'sig-bn-pe',
+    symbol: 'BANKNIFTY 48200 PE',
+    segment: 'F&O',
+    direction: 'BUY',
+    type: 'Trend Ride',
+    entry: 210.50,
+    target: 280.00,
+    stoploss: 175.00,
+    confidence: 79,
+    qty: 15
+  },
+  {
+    id: 'sig-fn-ce',
+    symbol: 'FINNIFTY 21600 CE',
+    segment: 'F&O',
+    direction: 'BUY',
+    type: 'Momentum',
+    entry: 85.00,
+    target: 125.00,
+    stoploss: 65.00,
+    confidence: 85,
+    qty: 40
   }
 ];
 
@@ -96,12 +137,6 @@ export function Dashboard() {
   const { data: fiiDiiDocs } = useCollection(fiiDiiQuery);
   const latestFiiDii = fiiDiiDocs?.[0];
 
-  const signalsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'signals'), orderBy('firedAt', 'desc'), limit(3));
-  }, [firestore]);
-  const { data: liveSignals } = useCollection(signalsQuery);
-
   const tradesQuery = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
     return query(
@@ -112,7 +147,6 @@ export function Dashboard() {
   const { data: openPositions } = useCollection(tradesQuery);
 
   const totalPnL = 2450.50;
-  const riskPercent = 32;
   const marketBias = "BULLISH";
   
   const getAiRecommendation = () => {
@@ -133,20 +167,20 @@ export function Dashboard() {
   };
   const conviction = getConviction();
 
-  const handleQuickTrade = (strategy: typeof FO_STRATEGIES[0]) => {
+  const executeTrade = (tradeData: { symbol: string, side: string, segment: string, qty: number, price: number, strategy: string }) => {
     if (!firestore || !userId) return;
     const tradesRef = collection(firestore, 'users', userId, 'trades');
     addDocumentNonBlocking(tradesRef, {
       userId,
-      symbol: strategy.symbol,
+      symbol: tradeData.symbol,
       exchange: 'NSE',
-      segment: 'F&O',
-      side: strategy.direction,
-      qty: 50,
-      entryPrice: strategy.entryPrice,
+      segment: tradeData.segment,
+      side: tradeData.side,
+      qty: tradeData.qty,
+      entryPrice: tradeData.price,
       status: 'OPEN',
       brokerOrderId: 'QT-' + Math.random().toString(36).substr(2, 9),
-      strategyName: strategy.name,
+      strategyName: tradeData.strategy,
       openedAt: new Date().toISOString(),
       createdAt: new Date().toISOString()
     });
@@ -157,7 +191,7 @@ export function Dashboard() {
     const tradeRef = doc(firestore, 'users', userId, 'trades', tradeId);
     updateDocumentNonBlocking(tradeRef, {
       status: 'CLOSED',
-      exitPrice: 22500.50,
+      exitPrice: 22500.50, // Mock exit price
       closedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -239,7 +273,6 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Signals & Intelligence */}
         <div className="lg:col-span-8 space-y-6">
           
           {/* AI F&O Suggestion Section */}
@@ -292,14 +325,18 @@ export function Dashboard() {
                     </div>
                     <Button 
                       className="w-full h-12 text-sm font-bold gap-2 shadow-purple"
-                      onClick={() => handleQuickTrade(currentStrategy)}
+                      onClick={() => executeTrade({
+                        symbol: currentStrategy.symbol,
+                        side: currentStrategy.direction,
+                        segment: 'F&O',
+                        qty: 50,
+                        price: currentStrategy.entryPrice,
+                        strategy: currentStrategy.name
+                      })}
                     >
                       <Zap className="w-4 h-4 fill-current" />
                       QUICK TRADE EXECUTION
                     </Button>
-                    <p className="text-[10px] text-center text-muted-foreground font-medium">
-                      Protected by Digi's AI Risk Guardian.
-                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -345,8 +382,8 @@ export function Dashboard() {
                           </p>
                         </div>
                         <div className="text-center">
-                          <p className="text-[9px] font-bold text-muted-foreground uppercase">Current Price</p>
-                          <p className="text-sm font-bold mono-font">₹22,485.20</p>
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase">Status</p>
+                          <Badge variant="outline" className="text-[9px] font-bold border-bull/20 text-bull">ACTIVE</Badge>
                         </div>
                       </div>
 
@@ -360,9 +397,6 @@ export function Dashboard() {
                           <XCircle className="w-3.5 h-3.5" />
                           EXIT NOW
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground">
-                          <Eye className="w-4 h-4" />
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -371,7 +405,7 @@ export function Dashboard() {
             </div>
           )}
 
-          {/* Signal Center */}
+          {/* Live AI Signal Center */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-headline font-bold flex items-center gap-2">
@@ -379,38 +413,58 @@ export function Dashboard() {
                 Live AI Signals
               </h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {liveSignals?.map((signal) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {AI_RECOMMENDED_SIGNALS.map((signal) => (
                 <Card key={signal.id} className="group relative overflow-hidden border-primary/5 hover:border-primary/20 transition-all bg-card/50 backdrop-blur-sm">
                   <div className={cn(
                     "absolute top-0 left-0 w-1 h-full",
                     signal.direction === 'BUY' ? "bg-bull" : "bg-bear"
                   )} />
-                  <CardContent className="p-4 space-y-3">
+                  <CardContent className="p-4 space-y-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-sm font-bold">{signal.symbol}</p>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase">{signal.signalType}</p>
-                      </div>
-                      <Badge className={cn(
-                        "text-[9px] font-bold border-none",
-                        signal.direction === 'BUY' ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
-                      )}>
-                        {signal.direction}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between items-end">
-                      <div className="space-y-1">
-                        <p className="text-[9px] text-muted-foreground font-bold uppercase">Target</p>
-                        <p className="text-xs font-bold mono-font text-bull">₹{signal.target1}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold">{signal.symbol}</p>
+                          <Badge variant="outline" className="text-[8px] font-bold h-4 px-1 border-muted-foreground/20 text-muted-foreground">
+                            {signal.segment}
+                          </Badge>
+                        </div>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase">{signal.type}</p>
                       </div>
                       <div className="text-right">
-                        <div className="flex items-center gap-1 text-[9px] font-bold text-primary mb-1">
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-primary">
                           <BrainCircuit className="w-3 h-3" />
                           {signal.confidence}%
                         </div>
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-2 bg-muted/20 p-2 rounded-lg">
+                      <div>
+                        <p className="text-[8px] text-muted-foreground font-bold uppercase">Entry Target</p>
+                        <p className="text-xs font-bold mono-font">₹{signal.entry}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[8px] text-muted-foreground font-bold uppercase">Target 1</p>
+                        <p className="text-xs font-bold mono-font text-bull">₹{signal.target}</p>
+                      </div>
+                    </div>
+
+                    <Button 
+                      size="sm" 
+                      className="w-full h-8 text-[10px] font-bold gap-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white border-none shadow-none"
+                      onClick={() => executeTrade({
+                        symbol: signal.symbol,
+                        side: signal.direction,
+                        segment: signal.segment,
+                        qty: signal.qty,
+                        price: signal.entry,
+                        strategy: 'AI Signal: ' + signal.type
+                      })}
+                    >
+                      <Zap className="w-3 h-3 fill-current" />
+                      QUICK TRADE
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -420,7 +474,6 @@ export function Dashboard() {
 
         {/* Right Sidebar */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Morning Intel */}
           <Card className="shadow-purple border-primary/10 bg-gradient-to-br from-primary/[0.03] to-transparent">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-headline font-bold uppercase tracking-widest text-primary flex items-center gap-2">
@@ -446,7 +499,6 @@ export function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Risk Guardian */}
           <Card className="shadow-sm border-primary/10 overflow-hidden">
             <div className="bg-primary px-4 py-2 flex items-center justify-between text-white">
               <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
@@ -467,38 +519,7 @@ export function Dashboard() {
                   <span>Daily Loss Cap</span>
                   <span className="text-bull">₹0 / ₹5,000</span>
                 </div>
-                <Progress value={riskPercent} className="h-2" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-muted/30 p-3 rounded-xl border border-muted-foreground/10 text-center">
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Health</p>
-                  <p className="text-sm font-bold text-bull">96%</p>
-                </div>
-                <div className="bg-muted/30 p-3 rounded-xl border border-muted-foreground/10 text-center">
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Focus</p>
-                  <p className="text-sm font-bold">STABLE</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Market Pulse */}
-          <Card className="shadow-sm border-none bg-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Market Pulse</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-bold p-2 border-b">
-                <span className="text-muted-foreground flex items-center gap-1.5 uppercase">
-                  <Activity className="w-3 h-3" /> PCR (Nifty)
-                </span>
-                <span className="mono-font text-bull font-bold">1.28</span>
-              </div>
-              <div className="flex items-center justify-between text-[11px] font-bold p-2">
-                <span className="text-muted-foreground flex items-center gap-1.5 uppercase">
-                  <TrendingUp className="w-3 h-3" /> India VIX
-                </span>
-                <span className="mono-font text-bear font-bold">13.42 (-0.56%)</span>
+                <Progress value={32} className="h-2" />
               </div>
             </CardContent>
           </Card>

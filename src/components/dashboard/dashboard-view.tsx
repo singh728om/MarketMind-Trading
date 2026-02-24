@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, Zap, Activity, Radio, TrendingUp, 
-  ArrowUpRight, Sparkles, BrainCircuit, LineChart,
-  Search, Eye, ArrowRightLeft, Power, XCircle, 
-  CheckCircle2, Info, ShoppingCart
+  Sparkles, BrainCircuit, Eye, XCircle, 
+  ShoppingCart, ChevronRight, ChevronLeft
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { MascotDigi } from "@/components/mascot-digi";
@@ -23,18 +22,73 @@ import {
 } from '@/firebase';
 import { collection, query, orderBy, limit, where, doc } from 'firebase/firestore';
 
+const FO_STRATEGIES = [
+  {
+    id: 'nifty-bull-call',
+    symbol: 'NIFTY',
+    name: 'Bull Call Spread',
+    expiry: '21 MAR',
+    badge: 'NIFTY WEEKLY',
+    description: 'High OI buildup at 22,400 PE and rising PCR indicates strong support. Strategy: Buy 22,450 CE / Sell 22,600 CE.',
+    maxProfit: '₹8,450',
+    maxLoss: '₹3,200',
+    confidence: 84,
+    direction: 'BUY',
+    entryPrice: 22450
+  },
+  {
+    id: 'banknifty-bear-put',
+    symbol: 'BANKNIFTY',
+    name: 'Bear Put Spread',
+    expiry: '21 MAR',
+    badge: 'BANKNIFTY WEEKLY',
+    description: 'Resistance at 48,500 CE is strengthening. FIIs are hedging. Strategy: Buy 48,200 PE / Sell 48,000 PE.',
+    maxProfit: '₹12,200',
+    maxLoss: '₹4,800',
+    confidence: 76,
+    direction: 'SELL',
+    entryPrice: 48200
+  },
+  {
+    id: 'finnifty-iron-condor',
+    symbol: 'FINNIFTY',
+    name: 'Short Iron Condor',
+    expiry: '25 MAR',
+    badge: 'FINNIFTY MONTHLY',
+    description: 'Range-bound expectation between 21,200 and 21,800. Low VIX favors credit spreads.',
+    maxProfit: '₹5,600',
+    maxLoss: '₹2,400',
+    confidence: 91,
+    direction: 'BUY',
+    entryPrice: 21500
+  },
+  {
+    id: 'reliance-long-straddle',
+    symbol: 'RELIANCE',
+    name: 'Long Straddle',
+    expiry: '28 MAR',
+    badge: 'EQUITY F&O',
+    description: 'Impending breakout from 2,950 consolidation zone. High volume expected post-results.',
+    maxProfit: 'Unlimited',
+    maxLoss: '₹9,100',
+    confidence: 68,
+    direction: 'BUY',
+    entryPrice: 2980
+  }
+];
+
 export function Dashboard() {
   const { firestore } = useFirebase();
   const { user } = useUser();
   const userId = user?.uid;
 
-  // Hydration safety for local time
   const [mounted, setMounted] = useState(false);
+  const [strategyIndex, setStrategyIndex] = useState(0);
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Fetch Latest FII/DII Data
   const fiiDiiQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'fii_dii_data'), orderBy('date', 'desc'), limit(1));
@@ -42,14 +96,12 @@ export function Dashboard() {
   const { data: fiiDiiDocs } = useCollection(fiiDiiQuery);
   const latestFiiDii = fiiDiiDocs?.[0];
 
-  // Fetch Latest AI Signals
   const signalsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'signals'), orderBy('firedAt', 'desc'), limit(3));
   }, [firestore]);
   const { data: liveSignals } = useCollection(signalsQuery);
 
-  // Fetch User's Open Positions
   const tradesQuery = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
     return query(
@@ -59,7 +111,6 @@ export function Dashboard() {
   }, [firestore, userId]);
   const { data: openPositions } = useCollection(tradesQuery);
 
-  // Fallback / Mock AI Stats
   const totalPnL = 2450.50;
   const riskPercent = 32;
   const marketBias = "BULLISH";
@@ -82,36 +133,40 @@ export function Dashboard() {
   };
   const conviction = getConviction();
 
-  // Handle Quick Trade Execution
-  const handleQuickTrade = (signal: any) => {
+  const handleQuickTrade = (strategy: typeof FO_STRATEGIES[0]) => {
     if (!firestore || !userId) return;
     const tradesRef = collection(firestore, 'users', userId, 'trades');
     addDocumentNonBlocking(tradesRef, {
       userId,
-      symbol: signal.symbol,
-      exchange: signal.exchange || 'NSE',
-      segment: signal.segment || 'F&O',
-      side: signal.direction,
-      qty: 50, // Default lot size for simulation
-      entryPrice: signal.entryLow || 0,
+      symbol: strategy.symbol,
+      exchange: 'NSE',
+      segment: 'F&O',
+      side: strategy.direction,
+      qty: 50,
+      entryPrice: strategy.entryPrice,
       status: 'OPEN',
       brokerOrderId: 'QT-' + Math.random().toString(36).substr(2, 9),
+      strategyName: strategy.name,
       openedAt: new Date().toISOString(),
       createdAt: new Date().toISOString()
     });
   };
 
-  // Handle Position Exit
   const handleExitPosition = (tradeId: string) => {
     if (!firestore || !userId) return;
     const tradeRef = doc(firestore, 'users', userId, 'trades', tradeId);
     updateDocumentNonBlocking(tradeRef, {
       status: 'CLOSED',
-      exitPrice: 22500.50, // Mock exit price
+      exitPrice: 22500.50,
       closedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
   };
+
+  const nextStrategy = () => setStrategyIndex((prev) => (prev + 1) % FO_STRATEGIES.length);
+  const prevStrategy = () => setStrategyIndex((prev) => (prev - 1 + FO_STRATEGIES.length) % FO_STRATEGIES.length);
+
+  const currentStrategy = FO_STRATEGIES[strategyIndex];
 
   if (!mounted) return null;
 
@@ -144,13 +199,11 @@ export function Dashboard() {
         <Card className="border-none shadow-sm bg-bull/5">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-bull/10 text-bull">
-              <ArrowRightLeft className="w-4 h-4" />
+              <Activity className="w-4 h-4" />
             </div>
             <div className="flex-1">
               <p className="text-[10px] font-bold text-muted-foreground uppercase">FII/DII Conviction</p>
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-bull">{conviction}</p>
-              </div>
+              <p className="text-sm font-bold text-bull">{conviction}</p>
             </div>
           </CardContent>
         </Card>
@@ -160,7 +213,7 @@ export function Dashboard() {
             <div className="p-2 rounded-lg bg-primary/10 text-primary">
               <Sparkles className="w-4 h-4" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-[10px] font-bold text-muted-foreground uppercase">AI Strategy</p>
               <div className="flex items-center gap-2">
                 <p className={cn("text-sm font-bold", recommendation.color)}>{recommendation.text}</p>
@@ -175,9 +228,9 @@ export function Dashboard() {
         <Card className="border-none shadow-sm bg-gold/5">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-gold/10 text-gold">
-              <Activity className="w-4 h-4" />
+              <TrendingUp className="w-4 h-4" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-[10px] font-bold text-muted-foreground uppercase">Market Vibe</p>
               <p className="text-sm font-bold text-gold">{marketBias}</p>
             </div>
@@ -196,48 +249,56 @@ export function Dashboard() {
                 <BrainCircuit className="w-5 h-5 text-primary" />
                 AI F&O Intelligence
               </h3>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prevStrategy}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-[10px] font-bold text-muted-foreground">{strategyIndex + 1} / {FO_STRATEGIES.length}</span>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextStrategy}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
             <Card className="border-primary/20 bg-primary/5 shadow-purple overflow-hidden">
               <CardContent className="p-0">
                 <div className="grid grid-cols-1 md:grid-cols-2">
                   <div className="p-6 space-y-4 border-r border-primary/10">
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-primary/20 text-primary border-none text-[10px] font-bold">NIFTY WEEKLY</Badge>
-                      <span className="text-xs font-bold text-muted-foreground">EXP: 21 MAR</span>
+                      <Badge className="bg-primary/20 text-primary border-none text-[10px] font-bold uppercase">{currentStrategy.badge}</Badge>
+                      <span className="text-xs font-bold text-muted-foreground">EXP: {currentStrategy.expiry}</span>
                     </div>
-                    <h4 className="text-xl font-bold">Bull Call Spread</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      High OI buildup at 22,400 PE and rising PCR indicates strong support. 
-                      Strategy: Buy 22,450 CE / Sell 22,600 CE.
+                    <h4 className="text-xl font-bold">{currentStrategy.name}</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed min-h-[60px]">
+                      {currentStrategy.description}
                     </p>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-background/50 p-3 rounded-xl border border-primary/5">
                         <p className="text-[9px] font-bold text-muted-foreground uppercase">Max Profit</p>
-                        <p className="text-sm font-bold text-bull">₹8,450</p>
+                        <p className="text-sm font-bold text-bull">{currentStrategy.maxProfit}</p>
                       </div>
                       <div className="bg-background/50 p-3 rounded-xl border border-primary/5">
-                        <p className="text-sm font-bold text-bear">₹3,200</p>
                         <p className="text-[9px] font-bold text-muted-foreground uppercase">Max Loss</p>
+                        <p className="text-sm font-bold text-bear">{currentStrategy.maxLoss}</p>
                       </div>
                     </div>
                   </div>
                   <div className="p-6 bg-white/40 backdrop-blur-sm flex flex-col justify-center gap-4">
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-muted-foreground uppercase">Confidence</span>
-                        <span className="text-primary">84%</span>
+                        <span className="text-muted-foreground uppercase">AI Confidence</span>
+                        <span className="text-primary">{currentStrategy.confidence}%</span>
                       </div>
-                      <Progress value={84} className="h-1.5" />
+                      <Progress value={currentStrategy.confidence} className="h-1.5" />
                     </div>
                     <Button 
                       className="w-full h-12 text-sm font-bold gap-2 shadow-purple"
-                      onClick={() => handleQuickTrade({ symbol: 'NIFTY', direction: 'BUY', entryLow: 22450 })}
+                      onClick={() => handleQuickTrade(currentStrategy)}
                     >
                       <Zap className="w-4 h-4 fill-current" />
                       QUICK TRADE EXECUTION
                     </Button>
                     <p className="text-[10px] text-center text-muted-foreground font-medium">
-                      One-tap execution with AI Risk Guardian protection.
+                      Protected by Digi's AI Risk Guardian.
                     </p>
                   </div>
                 </div>

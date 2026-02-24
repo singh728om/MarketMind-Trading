@@ -6,7 +6,7 @@ import {
   ShieldAlert, Zap, Activity, Radio, TrendingUp, 
   Sparkles, BrainCircuit, Eye, XCircle, 
   ShoppingCart, ChevronRight, ChevronLeft,
-  ArrowUpRight, ArrowDownRight
+  ArrowUpRight, ArrowDownRight, Power, Skull
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,32 @@ const FO_STRATEGIES = [
     confidence: 76,
     direction: 'SELL',
     entryPrice: 48200
+  },
+  {
+    id: 'nifty-iron-condor',
+    symbol: 'NIFTY',
+    name: 'Short Iron Condor',
+    expiry: '21 MAR',
+    badge: 'RANGE-BOUND',
+    description: 'VIX is stabilizing. NIFTY expected to stay between 22,200 - 22,600. Strategy: Multi-leg credit spread.',
+    maxProfit: '₹5,600',
+    maxLoss: '₹2,400',
+    confidence: 81,
+    direction: 'SELL',
+    entryPrice: 22400
+  },
+  {
+    id: 'reliance-breakout',
+    symbol: 'RELIANCE',
+    name: 'Long Straddle',
+    expiry: 'MAR END',
+    badge: 'EVENT SPECIAL',
+    description: 'High volatility expected ahead of results. Expecting a 3-5% move in either direction.',
+    maxProfit: 'Unlimited',
+    maxLoss: '₹6,500',
+    confidence: 79,
+    direction: 'BUY',
+    entryPrice: 2980
   }
 ];
 
@@ -78,6 +104,18 @@ const AI_RECOMMENDED_SIGNALS = [
     stoploss: 4080.00,
     confidence: 82,
     qty: 5
+  },
+  {
+    id: 'sig-infy',
+    symbol: 'INFY',
+    segment: 'EQUITY',
+    direction: 'SELL',
+    type: 'Resistance Rejection',
+    entry: 1640.00,
+    target: 1580.00,
+    stoploss: 1665.00,
+    confidence: 75,
+    qty: 20
   },
   // F&O Signals
   {
@@ -146,6 +184,15 @@ export function Dashboard() {
   }, [firestore, userId]);
   const { data: openPositions } = useCollection(tradesQuery);
 
+  const algosQuery = useMemoFirebase(() => {
+    if (!firestore || !userId) return null;
+    return query(
+      collection(firestore, 'users', userId, 'algos'),
+      where('status', '==', 'Deployed')
+    );
+  }, [firestore, userId]);
+  const { data: activeAlgos } = useCollection(algosQuery);
+
   const totalPnL = 2450.50;
   const marketBias = "BULLISH";
   
@@ -197,6 +244,24 @@ export function Dashboard() {
     });
   };
 
+  const handleKillAll = () => {
+    if (!firestore || !userId) return;
+    
+    // 1. Exit all open positions
+    openPositions?.forEach(pos => {
+      handleExitPosition(pos.id);
+    });
+
+    // 2. Pause all active algos
+    activeAlgos?.forEach(algo => {
+      const algoRef = doc(firestore, 'users', userId, 'algos', algo.id);
+      updateDocumentNonBlocking(algoRef, {
+        status: 'Paused',
+        updatedAt: new Date().toISOString()
+      });
+    });
+  };
+
   const nextStrategy = () => setStrategyIndex((prev) => (prev + 1) % FO_STRATEGIES.length);
   const prevStrategy = () => setStrategyIndex((prev) => (prev - 1 + FO_STRATEGIES.length) % FO_STRATEGIES.length);
 
@@ -220,11 +285,43 @@ export function Dashboard() {
             </p>
           </div>
         </div>
-        <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[200px]">
-          <div className={cn("mono-font text-2xl font-extrabold", totalPnL >= 0 ? "text-bull" : "text-bear")}>
-            ₹{totalPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Daily P&L Window */}
+          <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[160px]">
+            <div className={cn("mono-font text-2xl font-extrabold", totalPnL >= 0 ? "text-bull" : "text-bear")}>
+              ₹{totalPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Daily Session P&L</p>
           </div>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Daily Session P&L</p>
+
+          {/* Open Positions Window */}
+          <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[140px]">
+            <div className="mono-font text-2xl font-extrabold text-primary">
+              {openPositions?.length || 0}
+            </div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Open Positions</p>
+          </div>
+
+          {/* Active Algos Window */}
+          <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[140px]">
+            <div className="mono-font text-2xl font-extrabold text-gold">
+              {activeAlgos?.length || 0}
+            </div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Active Algos</p>
+          </div>
+
+          {/* Kill All Emergency Action */}
+          <Button 
+            variant="destructive" 
+            size="lg" 
+            className="h-[76px] px-6 rounded-2xl gap-2 font-bold uppercase text-xs"
+            onClick={handleKillAll}
+            disabled={!openPositions?.length && !activeAlgos?.length}
+          >
+            <Skull className="w-5 h-5" />
+            Kill All
+          </Button>
         </div>
       </div>
 

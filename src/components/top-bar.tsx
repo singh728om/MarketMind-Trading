@@ -24,7 +24,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useFirebase, useUser, useDoc, setDocumentNonBlocking, useMemoFirebase } from '@/firebase';
+import { 
+  useFirebase, 
+  useUser, 
+  useDoc, 
+  setDocumentNonBlocking, 
+  useMemoFirebase,
+  initiateAnonymousSignIn 
+} from '@/firebase';
 import { doc } from 'firebase/firestore';
 
 const indices = [
@@ -38,9 +45,16 @@ const indices = [
 
 export function TopBar() {
   const [time, setTime] = useState<Date | null>(null);
-  const { firestore } = useFirebase();
-  const { user } = useUser();
+  const { firestore, auth } = useFirebase();
+  const { user, isUserLoading } = useUser();
   const userId = user?.uid;
+
+  // Prototyping safeguard: Sign in anonymously if not logged in to enable profile saving
+  useEffect(() => {
+    if (!isUserLoading && !user && auth) {
+      initiateAnonymousSignIn(auth);
+    }
+  }, [user, isUserLoading, auth]);
 
   // Use memoized reference to prevent infinite loops and state resets
   const userRef = useMemoFirebase(() => {
@@ -65,11 +79,11 @@ export function TopBar() {
 
   // Initialize form data when dialog opens or profile loads
   useEffect(() => {
-    if (userProfile && isProfileOpen) {
+    if (isProfileOpen) {
       setFormData({
-        name: userProfile.name || "",
-        experienceLevel: userProfile.experienceLevel || "Beginner",
-        riskProfile: userProfile.riskProfile || "Moderate"
+        name: userProfile?.name || "",
+        experienceLevel: userProfile?.experienceLevel || "Beginner",
+        riskProfile: userProfile?.riskProfile || "Moderate"
       });
     }
   }, [userProfile, isProfileOpen]);
@@ -78,14 +92,19 @@ export function TopBar() {
     if (!firestore || !userId) return;
     
     // Ensure we have at least a name or a placeholder
-    const displayName = formData.name.trim() || user?.email?.split('@')[0] || "User";
+    const displayName = formData.name.trim() || user?.email?.split('@')[0] || "Trader";
     
     const docRef = doc(firestore, 'users', userId);
     
     setDocumentNonBlocking(docRef, {
       ...formData,
+      id: userId,
+      userId: userId,
       name: displayName,
-      email: user?.email,
+      email: user?.email || "anonymous@thedigiocean.ai",
+      plan: userProfile?.plan || "Free",
+      credits: userProfile?.credits || 100,
+      createdAt: userProfile?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }, { merge: true });
     
@@ -154,10 +173,10 @@ export function TopBar() {
               <div className="flex items-center gap-2 pl-2 border-l border-muted cursor-pointer hover:bg-muted p-1 rounded-lg transition-colors">
                 <Avatar className="h-8 w-8 ring-2 ring-primary/20">
                   <AvatarImage src={`https://picsum.photos/seed/${userId || 'default'}/32/32`} />
-                  <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
+                  <AvatarFallback>{userProfile?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}</AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block text-left mr-1">
-                  <p className="text-xs font-bold leading-none">{userProfile?.name || 'Set Name'}</p>
+                  <p className="text-xs font-bold leading-none">{userProfile?.name || 'Guest Trader'}</p>
                   <p className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">{userProfile?.plan || 'Free Plan'}</p>
                 </div>
                 <ChevronDown className="w-3 h-3 text-muted-foreground" />

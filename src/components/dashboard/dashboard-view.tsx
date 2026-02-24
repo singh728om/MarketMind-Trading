@@ -26,7 +26,7 @@ export function Dashboard() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
-  // 1. Fetch Open Trades
+  // 1. Fetch Open Trades (Requires Auth)
   const openTradesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -36,7 +36,7 @@ export function Dashboard() {
   }, [firestore, user?.uid]);
   const { data: openTrades, isLoading: tradesLoading } = useCollection(openTradesQuery);
 
-  // 2. Fetch Active Algos
+  // 2. Fetch Active Algos (Requires Auth)
   const activeAlgosQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -46,7 +46,7 @@ export function Dashboard() {
   }, [firestore, user?.uid]);
   const { data: activeAlgos, isLoading: algosLoading } = useCollection(activeAlgosQuery);
 
-  // 3. Fetch Primary Broker Connection (for funds)
+  // 3. Fetch Primary Broker Connection (Requires Auth)
   const brokerQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -57,7 +57,7 @@ export function Dashboard() {
   const { data: brokers } = useCollection(brokerQuery);
   const primaryBroker = brokers?.[0];
 
-  // 4. Fetch Platform Signals (AI Functionality)
+  // 4. Fetch Platform Signals (Public)
   const signalsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -180,7 +180,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y">
-                {!tradesLoading && openTrades?.length === 0 && (
+                {!tradesLoading && (!openTrades || openTrades.length === 0) && (
                   <div className="text-center py-12 text-muted-foreground flex flex-col items-center gap-2">
                     <div className="p-3 bg-muted rounded-full">
                       <Zap className="w-6 h-6 opacity-20" />
@@ -301,7 +301,7 @@ export function Dashboard() {
                   {riskPercent > 80 
                     ? "Warning: You are approaching your daily loss limit. I recommend reducing your quantity." 
                     : riskPercent > 40
-                    ? "Careful Ajay, losses are increasing. Stick to your A-plus setups only."
+                    ? "Careful, losses are increasing. Stick to your A-plus setups only."
                     : "Market sentiment is positive. Your current exposure is well within limits. Keep trading disciplined!"}
                 </div>
               </div>

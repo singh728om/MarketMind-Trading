@@ -2,10 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Shield, Bell, CreditCard, ChevronDown } from 'lucide-react';
+import { Shield, Bell, CreditCard, ChevronDown, User, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useFirebase, useUser, useDoc, updateDocumentNonBlocking } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 const indices = [
   { name: 'NIFTY 50', value: '22,450.30', change: '+125.40', pct: '+0.56%', trend: 'up' },
@@ -18,13 +31,38 @@ const indices = [
 
 export function TopBar() {
   const [time, setTime] = useState<Date | null>(null);
+  const { firestore } = useFirebase();
+  const { user } = useUser();
+  const userId = user?.uid;
+
+  // Fetch user profile from Firestore
+  const userRef = userId ? doc(firestore, 'users', userId) : null;
+  const { data: userProfile } = useDoc(userRef);
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [newName, setNewName] = useState("");
 
   useEffect(() => {
-    // Set initial time on client side mount
     setTime(new Date());
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (userProfile?.name) {
+      setNewName(userProfile.name);
+    }
+  }, [userProfile]);
+
+  const handleUpdateProfile = () => {
+    if (!firestore || !userId || !newName.trim()) return;
+    const docRef = doc(firestore, 'users', userId);
+    updateDocumentNonBlocking(docRef, {
+      name: newName.trim(),
+      updatedAt: new Date().toISOString()
+    });
+    setIsProfileOpen(false);
+  };
 
   return (
     <header className="fixed top-0 z-50 h-16 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm px-4 flex items-center justify-between">
@@ -83,17 +121,51 @@ export function TopBar() {
             <span className="mono-font text-xs font-bold">842 cr</span>
           </div>
 
-          <div className="flex items-center gap-2 pl-2 border-l border-muted cursor-pointer hover:bg-muted p-1 rounded-lg transition-colors">
-            <Avatar className="h-8 w-8 ring-2 ring-primary/20">
-              <AvatarImage src="https://picsum.photos/seed/user/32/32" />
-              <AvatarFallback>AK</AvatarFallback>
-            </Avatar>
-            <div className="hidden sm:block text-left mr-1">
-              <p className="text-xs font-bold leading-none">Ajay Kumar</p>
-              <p className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">Pro Trader</p>
-            </div>
-            <ChevronDown className="w-3 h-3 text-muted-foreground" />
-          </div>
+          <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+            <DialogTrigger asChild>
+              <div className="flex items-center gap-2 pl-2 border-l border-muted cursor-pointer hover:bg-muted p-1 rounded-lg transition-colors">
+                <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+                  <AvatarImage src="https://picsum.photos/seed/user/32/32" />
+                  <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
+                </Avatar>
+                <div className="hidden sm:block text-left mr-1">
+                  <p className="text-xs font-bold leading-none">{userProfile?.name || 'User'}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">Pro Trader</p>
+                </div>
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              </div>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-primary" />
+                  Edit Profile
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Display Name</Label>
+                  <Input 
+                    id="name" 
+                    value={newName} 
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="h-11"
+                  />
+                </div>
+                <div className="p-3 bg-muted/30 rounded-xl border text-[11px] text-muted-foreground">
+                  Your name will be visible across the platform and in your trade journals.
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsProfileOpen(false)}>Cancel</Button>
+                <Button onClick={handleUpdateProfile} className="gap-2">
+                  <Check className="w-4 h-4" />
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </header>

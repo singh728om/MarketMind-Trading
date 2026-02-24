@@ -222,7 +222,8 @@ export default function FnoIntelligence() {
                               <div className="flex items-center gap-2">
                                 <Badge className={cn("text-[9px] px-1 h-4", leg.type === 'BUY' ? "bg-bull/20 text-bull" : "bg-bear/20 text-bear")}>
                                   {leg.type}
-                                sand>{leg.strike} {leg.instrument}</span>
+                                </Badge>
+                                <span>{leg.strike} {leg.instrument}</span>
                               </div>
                               <span className="mono-font font-bold">₹{leg.premium}</span>
                             </div>

@@ -10,3 +10,5 @@ import '@/ai/flows/ai-market-brief-fii-dii-insights.ts';
 import '@/ai/flows/ai-multi-persona-advisor.ts';
 import '@/ai/flows/algo-orchestrator-flow.ts';
 import '@/ai/flows/backtest-analysis-flow.ts';
+import '@/ai/flows/ai-news-sentiment-analysis.ts';
+import '@/ai/flows/swing-positional-recommendations.ts';

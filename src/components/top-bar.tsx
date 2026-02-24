@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Shield, Bell, CreditCard, ChevronDown, User, Check } from 'lucide-react';
+import { Shield, Bell, CreditCard, ChevronDown, User, Check, Target, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -17,7 +17,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useFirebase, useUser, useDoc, updateDocumentNonBlocking } from '@/firebase';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useFirebase, useUser, useDoc, setDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
 
 const indices = [
@@ -40,7 +47,11 @@ export function TopBar() {
   const { data: userProfile } = useDoc(userRef);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [formData, setFormData] = useState({
+    name: "",
+    experienceLevel: "Beginner",
+    riskProfile: "Moderate"
+  });
 
   useEffect(() => {
     setTime(new Date());
@@ -49,18 +60,25 @@ export function TopBar() {
   }, []);
 
   useEffect(() => {
-    if (userProfile?.name) {
-      setNewName(userProfile.name);
+    if (userProfile) {
+      setFormData({
+        name: userProfile.name || "",
+        experienceLevel: userProfile.experienceLevel || "Beginner",
+        riskProfile: userProfile.riskProfile || "Moderate"
+      });
     }
   }, [userProfile]);
 
   const handleUpdateProfile = () => {
-    if (!firestore || !userId || !newName.trim()) return;
+    if (!firestore || !userId || !formData.name.trim()) return;
     const docRef = doc(firestore, 'users', userId);
-    updateDocumentNonBlocking(docRef, {
-      name: newName.trim(),
+    
+    setDocumentNonBlocking(docRef, {
+      ...formData,
+      email: user?.email,
       updatedAt: new Date().toISOString()
-    });
+    }, { merge: true });
+    
     setIsProfileOpen(false);
   };
 
@@ -125,12 +143,12 @@ export function TopBar() {
             <DialogTrigger asChild>
               <div className="flex items-center gap-2 pl-2 border-l border-muted cursor-pointer hover:bg-muted p-1 rounded-lg transition-colors">
                 <Avatar className="h-8 w-8 ring-2 ring-primary/20">
-                  <AvatarImage src="https://picsum.photos/seed/user/32/32" />
+                  <AvatarImage src={`https://picsum.photos/seed/${userId || 'default'}/32/32`} />
                   <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block text-left mr-1">
-                  <p className="text-xs font-bold leading-none">{userProfile?.name || 'User'}</p>
-                  <p className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">Pro Trader</p>
+                  <p className="text-xs font-bold leading-none">{userProfile?.name || 'Set Name'}</p>
+                  <p className="text-[10px] text-muted-foreground font-medium uppercase mt-0.5">{userProfile?.plan || 'Free Plan'}</p>
                 </div>
                 <ChevronDown className="w-3 h-3 text-muted-foreground" />
               </div>
@@ -142,24 +160,64 @@ export function TopBar() {
                   Edit Profile
                 </DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
+              <div className="grid gap-6 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Display Name</Label>
+                  <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Display Name</Label>
                   <Input 
                     id="name" 
-                    value={newName} 
-                    onChange={(e) => setNewName(e.target.value)}
+                    value={formData.name} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter your name"
                     className="h-11"
                   />
                 </div>
-                <div className="p-3 bg-muted/30 rounded-xl border text-[11px] text-muted-foreground">
-                  Your name will be visible across the platform and in your trade journals.
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Trophy className="w-3 h-3" /> Experience
+                    </Label>
+                    <Select 
+                      value={formData.experienceLevel} 
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, experienceLevel: val }))}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Beginner">Beginner</SelectItem>
+                        <SelectItem value="Experienced">Experienced</SelectItem>
+                        <SelectItem value="Professional">Professional</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Target className="w-3 h-3" /> Risk Profile
+                    </Label>
+                    <Select 
+                      value={formData.riskProfile} 
+                      onValueChange={(val) => setFormData(prev => ({ ...prev, riskProfile: val }))}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Select profile" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Conservative">Conservative</SelectItem>
+                        <SelectItem value="Moderate">Moderate</SelectItem>
+                        <SelectItem value="Aggressive">Aggressive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-primary/5 rounded-xl border border-primary/10 text-[11px] text-muted-foreground leading-relaxed">
+                  Digi AI uses your profile data to customize trade suggestions and risk warnings. Ensure your risk profile matches your actual appetite.
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsProfileOpen(false)}>Cancel</Button>
-                <Button onClick={handleUpdateProfile} className="gap-2">
+                <Button onClick={handleUpdateProfile} className="gap-2 bg-primary shadow-purple">
                   <Check className="w-4 h-4" />
                   Save Changes
                 </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface TradingViewChartProps {
@@ -17,6 +17,7 @@ export function TradingViewChart({
   hideBorder = false
 }: TradingViewChartProps) {
   const container = useRef<HTMLDivElement>(null);
+  const chartId = useId().replace(/:/g, ""); // Stable ID for this component instance
 
   useEffect(() => {
     // Standard TradingView Advanced Charting Widget
@@ -24,9 +25,13 @@ export function TradingViewChart({
     script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
     script.type = "text/javascript";
     script.async = true;
+    
+    // Ensure the symbol has the correct exchange prefix
+    const formattedSymbol = symbol.includes(':') ? symbol : `NSE:${symbol}`;
+
     script.innerHTML = JSON.stringify({
       "autosize": autosize,
-      "symbol": `NSE:${symbol}`,
+      "symbol": formattedSymbol,
       "interval": "5",
       "timezone": "Asia/Kolkata",
       "theme": theme,
@@ -36,7 +41,7 @@ export function TradingViewChart({
       "allow_symbol_change": true,
       "calendar": false,
       "support_host": "https://www.tradingview.com",
-      "container_id": `tv_chart_${Math.random().toString(36).substr(2, 9)}`
+      "container_id": `tv_chart_${chartId}`
     });
 
     if (container.current) {
@@ -49,7 +54,7 @@ export function TradingViewChart({
         container.current.innerHTML = "";
       }
     };
-  }, [symbol, theme, autosize]);
+  }, [symbol, theme, autosize, chartId]);
 
   return (
     <div 
@@ -59,7 +64,7 @@ export function TradingViewChart({
       )} 
       ref={container}
     >
-      <div className="tradingview-widget-container__widget h-full w-full"></div>
+      <div id={`tv_chart_${chartId}`} className="tradingview-widget-container__widget h-full w-full"></div>
     </div>
   );
 }

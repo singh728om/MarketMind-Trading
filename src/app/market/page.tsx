@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   Maximize2, 
   Columns, 
@@ -40,11 +40,56 @@ const AVAILABLE_SYMBOLS = [
   { label: 'TATA MOTORS', value: 'TATAMOTORS' },
 ];
 
+// Moving sub-component outside to prevent remounting on parent state change
+const ChartWindow = React.memo(({ 
+  index, 
+  symbol, 
+  onSymbolChange 
+}: { 
+  index: number, 
+  symbol: string, 
+  onSymbolChange: (index: number, val: string) => void 
+}) => (
+  <div className="relative h-full w-full bg-background flex flex-col group">
+    <div className="absolute top-2 left-2 right-2 z-20 flex items-center justify-between pointer-events-none">
+      <div className="flex items-center gap-2 pointer-events-auto">
+        <Select 
+          value={symbol} 
+          onValueChange={(val) => onSymbolChange(index, val)}
+        >
+          <SelectTrigger className="h-7 w-32 bg-background/80 backdrop-blur-sm border-none shadow-sm text-[10px] font-bold uppercase focus:ring-1 focus:ring-primary/30">
+            <SelectValue placeholder="Symbol" />
+          </SelectTrigger>
+          <SelectContent>
+            {AVAILABLE_SYMBOLS.map(s => (
+              <SelectItem key={s.value} value={s.value} className="text-[10px] font-bold">
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Badge variant="outline" className="bg-background/80 backdrop-blur-sm border-none text-[9px] font-bold text-muted-foreground px-1.5 py-0">
+          5m • NSE
+        </Badge>
+      </div>
+      <div className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 bg-background/80 backdrop-blur-sm hover:bg-background">
+          <Settings2 className="w-3 h-3 text-muted-foreground" />
+        </Button>
+      </div>
+    </div>
+    <div className="flex-1">
+      <TradingViewChart symbol={symbol} hideBorder />
+    </div>
+  </div>
+));
+
+ChartWindow.displayName = "ChartWindow";
+
 export default function MarketPage() {
   const [layout, setLayout] = useState<LayoutMode>('single');
   const [isFullView, setIsFullView] = useState(true);
   
-  // Manage symbols for up to 4 charts
   const [chartSymbols, setChartSymbols] = useState<string[]>([
     'NIFTY',
     'BANKNIFTY',
@@ -52,47 +97,13 @@ export default function MarketPage() {
     'HDFCBANK'
   ]);
 
-  const updateChartSymbol = (index: number, newSymbol: string) => {
-    const newSymbols = [...chartSymbols];
-    newSymbols[index] = newSymbol;
-    setChartSymbols(newSymbols);
-  };
-
-  const ChartWindow = ({ index, title }: { index: number, title?: string }) => (
-    <div className="relative h-full w-full bg-background flex flex-col group">
-      {/* Chart Header Overlay */}
-      <div className="absolute top-2 left-2 right-2 z-20 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <Select 
-            value={chartSymbols[index]} 
-            onValueChange={(val) => updateChartSymbol(index, val)}
-          >
-            <SelectTrigger className="h-7 w-32 bg-background/80 backdrop-blur-sm border-none shadow-sm text-[10px] font-bold uppercase focus:ring-1 focus:ring-primary/30">
-              <SelectValue placeholder="Symbol" />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_SYMBOLS.map(s => (
-                <SelectItem key={s.value} value={s.value} className="text-[10px] font-bold">
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Badge variant="outline" className="bg-background/80 backdrop-blur-sm border-none text-[9px] font-bold text-muted-foreground px-1.5 py-0">
-            5m • NSE
-          </Badge>
-        </div>
-        <div className="pointer-events-auto opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 bg-background/80 backdrop-blur-sm hover:bg-background">
-            <Settings2 className="w-3 h-3 text-muted-foreground" />
-          </Button>
-        </div>
-      </div>
-      <div className="flex-1">
-        <TradingViewChart symbol={chartSymbols[index]} hideBorder />
-      </div>
-    </div>
-  );
+  const updateChartSymbol = useCallback((index: number, newSymbol: string) => {
+    setChartSymbols(prev => {
+      const next = [...prev];
+      next[index] = newSymbol;
+      return next;
+    });
+  }, []);
 
   return (
     <div className={cn(
@@ -174,21 +185,35 @@ export default function MarketPage() {
         layout === 'split2' ? "grid-cols-1 lg:grid-cols-2" : 
         "grid-cols-1 md:grid-cols-2 lg:grid-cols-2"
       )}>
-        {layout === 'single' && <ChartWindow index={0} />}
+        {layout === 'single' && (
+          <ChartWindow 
+            index={0} 
+            symbol={chartSymbols[0]} 
+            onSymbolChange={updateChartSymbol} 
+          />
+        )}
 
         {layout === 'split2' && (
           <>
-            <ChartWindow index={0} />
-            <ChartWindow index={1} />
+            <ChartWindow 
+              index={0} 
+              symbol={chartSymbols[0]} 
+              onSymbolChange={updateChartSymbol} 
+            />
+            <ChartWindow 
+              index={1} 
+              symbol={chartSymbols[1]} 
+              onSymbolChange={updateChartSymbol} 
+            />
           </>
         )}
 
         {layout === 'split4' && (
           <>
-            <ChartWindow index={0} />
-            <ChartWindow index={1} />
-            <ChartWindow index={2} />
-            <ChartWindow index={3} />
+            <ChartWindow index={0} symbol={chartSymbols[0]} onSymbolChange={updateChartSymbol} />
+            <ChartWindow index={1} symbol={chartSymbols[1]} onSymbolChange={updateChartSymbol} />
+            <ChartWindow index={2} symbol={chartSymbols[2]} onSymbolChange={updateChartSymbol} />
+            <ChartWindow index={3} symbol={chartSymbols[3]} onSymbolChange={updateChartSymbol} />
           </>
         )}
       </div>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -6,9 +5,10 @@ import {
   ShieldAlert, Zap, Activity, Radio, TrendingUp, 
   Sparkles, BrainCircuit, Eye, XCircle, 
   ShoppingCart, ChevronRight, ChevronLeft,
-  ArrowUpRight, ArrowDownRight, Power
+  ArrowUpRight, ArrowDownRight, Power,
+  BarChart3, Target, Info
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { MascotDigi } from "@/components/mascot-digi";
@@ -80,7 +80,6 @@ const FO_STRATEGIES = [
 ];
 
 const AI_RECOMMENDED_SIGNALS = [
-  // Stock Signals
   {
     id: 'sig-rel',
     symbol: 'RELIANCE',
@@ -117,7 +116,6 @@ const AI_RECOMMENDED_SIGNALS = [
     confidence: 75,
     qty: 20
   },
-  // F&O Signals
   {
     id: 'sig-nifty-ce',
     symbol: 'NIFTY 22500 CE',
@@ -238,7 +236,7 @@ export function Dashboard() {
     const tradeRef = doc(firestore, 'users', userId, 'trades', tradeId);
     updateDocumentNonBlocking(tradeRef, {
       status: 'CLOSED',
-      exitPrice: 22500.50, // Mock exit price
+      exitPrice: 22500.50, 
       closedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -269,7 +267,6 @@ export function Dashboard() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          {/* Daily P&L Window */}
           <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[160px]">
             <div className={cn("mono-font text-2xl font-extrabold", totalPnL >= 0 ? "text-bull" : "text-bear")}>
               ₹{totalPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -277,7 +274,6 @@ export function Dashboard() {
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Daily Session P&L</p>
           </div>
 
-          {/* Open Positions Window */}
           <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[140px]">
             <div className="mono-font text-2xl font-extrabold text-primary">
               {openPositions?.length || 0}
@@ -285,7 +281,6 @@ export function Dashboard() {
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Open Positions</p>
           </div>
 
-          {/* Active Algos Window */}
           <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[140px]">
             <div className="mono-font text-2xl font-extrabold text-gold">
               {activeAlgos?.length || 0}
@@ -587,6 +582,62 @@ export function Dashboard() {
                   <span className="text-bull">₹0 / ₹5,000</span>
                 </div>
                 <Progress value={32} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* AI F&O Pro Recommendations */}
+          <Card className="shadow-sm border-gold/10 overflow-hidden bg-gradient-to-br from-gold/[0.02] to-transparent">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-headline font-bold uppercase tracking-widest text-gold flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                AI F&O Pro Insights
+              </CardTitle>
+              <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">
+                Advanced Strike & OI Analytics
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-3">
+                <div className="flex items-center gap-3 p-3 bg-card border border-gold/5 rounded-xl">
+                  <div className="p-2 rounded-lg bg-gold/10 text-gold">
+                    <Target className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">NIFTY Max Pain</p>
+                    <p className="text-xs font-extrabold mono-font">22,450.00</p>
+                    <p className="text-[8px] text-muted-foreground font-medium mt-0.5">Expect consolidation near this strike.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-card border border-primary/5 rounded-xl">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">OI Buildup Alert</p>
+                    <p className="text-xs font-extrabold mono-font text-bear">Resistance at 22,600</p>
+                    <p className="text-[8px] text-muted-foreground font-medium mt-0.5">Heavy call writing detected at 22.6k strike.</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 bg-card border border-bull/5 rounded-xl">
+                  <div className="p-2 rounded-lg bg-bull/10 text-bull">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold text-muted-foreground uppercase">PCR Trend</p>
+                    <p className="text-xs font-extrabold mono-font text-bull">1.28 (Bullish)</p>
+                    <p className="text-[8px] text-muted-foreground font-medium mt-0.5">Bullish divergence on the 15m timeframe.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-gold/5 border border-gold/10 rounded-xl flex gap-3">
+                <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                  "Pro-Tip: When Max Pain shifts upwards during the live session, it confirms institutional strength. Look for Bull Call Spreads."
+                </p>
               </div>
             </CardContent>
           </Card>

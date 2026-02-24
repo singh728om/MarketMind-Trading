@@ -10,9 +10,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
-        code: ['monospace'],
+        body: ['DM Sans', 'sans-serif'],
+        headline: ['Plus Jakarta Sans', 'sans-serif'],
+        code: ['JetBrains Mono', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',
@@ -45,6 +45,12 @@ export default {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        bull: 'hsl(var(--bull))',
+        bear: 'hsl(var(--bear))',
+        neutral: 'hsl(var(--neutral))',
+        gold: 'hsl(var(--gold))',
+        danger: 'hsl(var(--danger))',
+        info: 'hsl(var(--info))',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -70,6 +76,8 @@ export default {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        xl: '1.25rem',
+        pill: '9999px',
       },
       keyframes: {
         'accordion-down': {
@@ -88,10 +96,20 @@ export default {
             height: '0',
           },
         },
+        'scroll-left': {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(-100%)' }
+        },
+        'pulse-danger': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.5' },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+        'scroll-left': 'scroll-left 20s linear infinite',
+        'pulse-danger': 'pulse-danger 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
     },
   },

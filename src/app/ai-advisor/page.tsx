@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -31,26 +30,41 @@ import { Progress } from "@/components/ui/progress";
 import { MascotDigi } from "@/components/mascot-digi";
 import { cn } from "@/lib/utils";
 import { aiMultiPersonaAdvisor, type AiAdvisorOutput } from '@/ai/flows/ai-multi-persona-advisor';
+import { toast } from '@/hooks/use-toast';
 
 export default function AIAdvisorPage() {
   const [symbol, setSymbol] = useState("RELIANCE");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AiAdvisorOutput | null>(null);
 
-  const handleRunAnalysis = async () => {
-    if (!symbol) return;
+  const handleRunAnalysis = async (targetSymbol?: string) => {
+    const s = targetSymbol || symbol;
+    if (!s) return;
+    
     setIsAnalyzing(true);
+    setAnalysis(null);
+    
     try {
       const result = await aiMultiPersonaAdvisor({
-        symbol: symbol.toUpperCase(),
+        symbol: s.toUpperCase(),
         timeframe: 'Intraday'
       });
       setAnalysis(result);
     } catch (error) {
       console.error("Advisor Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: "Digi encountered an issue convening the panel. Please try again."
+      });
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleQuickLoad = (s: string) => {
+    setSymbol(s);
+    handleRunAnalysis(s);
   };
 
   return (
@@ -83,7 +97,7 @@ export default function AIAdvisorPage() {
           </div>
           <Button 
             className="gap-2 h-10 font-bold shadow-purple bg-primary hover:bg-primary/90" 
-            onClick={handleRunAnalysis}
+            onClick={() => handleRunAnalysis()}
             disabled={isAnalyzing}
           >
             {isAnalyzing ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-current" />}
@@ -102,7 +116,13 @@ export default function AIAdvisorPage() {
             </p>
             <div className="flex flex-wrap justify-center gap-2 pt-4">
               {['RELIANCE', 'NIFTY', 'HDFCBANK', 'TCS', 'INFY'].map(s => (
-                <Button key={s} variant="outline" size="sm" className="text-[10px] font-bold border-primary/10 hover:bg-primary/5" onClick={() => {setSymbol(s);}}>
+                <Button 
+                  key={s} 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-[10px] font-bold border-primary/10 hover:bg-primary/5" 
+                  onClick={() => handleQuickLoad(s)}
+                >
                   Quick Load: {s}
                 </Button>
               ))}
@@ -136,7 +156,14 @@ export default function AIAdvisorPage() {
                     <Users className="w-5 h-5 text-primary" />
                     <CardTitle className="text-lg font-bold">The Analyst Committee Debate</CardTitle>
                   </div>
-                  <Badge variant="outline" className="bg-bull/10 text-bull border-bull/20 font-bold uppercase text-[10px]">VERDICT: {analysis.consensus.bias.toUpperCase()}</Badge>
+                  <Badge variant="outline" className={cn(
+                    "font-bold uppercase text-[10px]",
+                    analysis.consensus.bias.includes('Buy') ? "bg-bull/10 text-bull border-bull/20" : 
+                    analysis.consensus.bias.includes('Sell') ? "bg-bear/10 text-bear border-bear/20" : 
+                    "bg-gold/10 text-gold border-gold/20"
+                  )}>
+                    VERDICT: {analysis.consensus.bias.toUpperCase()}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-6 space-y-8">

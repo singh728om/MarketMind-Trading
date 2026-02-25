@@ -29,7 +29,7 @@ const AiAdvisorOutputSchema = z.object({
     opinion: z.string(),
     keyFactor: z.string(),
     sentiment: z.enum(['Bullish', 'Bearish', 'Neutral']),
-  })).length(3),
+  })).min(1).describe('A list of expert opinions.'),
   tradePlan: z.object({
     entry: z.string(),
     target: z.string(),
@@ -39,6 +39,37 @@ const AiAdvisorOutputSchema = z.object({
 });
 export type AiAdvisorOutput = z.infer<typeof AiAdvisorOutputSchema>;
 
+// Tool to simulate fetching real-time data for the AI
+const getStockRealtimeMetricsTool = ai.defineTool(
+  {
+    name: 'getStockRealtimeMetrics',
+    description: 'Fetches real-time technical and institutional metrics for a given stock symbol.',
+    inputSchema: z.object({
+      symbol: z.string(),
+    }),
+    outputSchema: z.object({
+      rsi: z.number(),
+      vix: z.number(),
+      fiiActivity: z.string(),
+      volumeIntensity: z.string(),
+      majorResistance: z.number(),
+      majorSupport: z.number(),
+    }),
+  },
+  async (input) => {
+    // In a real app, this would call an external financial API
+    // For prototyping, we return realistic mock data based on the symbol
+    return {
+      rsi: 58 + Math.random() * 10,
+      vix: 13.4,
+      fiiActivity: 'Net Buyers (+₹1,240 Cr)',
+      volumeIntensity: '1.4x Avg',
+      majorResistance: 22600,
+      majorSupport: 22350,
+    };
+  }
+);
+
 export async function aiMultiPersonaAdvisor(input: AiAdvisorInput): Promise<AiAdvisorOutput> {
   return aiMultiPersonaAdvisorFlow(input);
 }
@@ -47,9 +78,12 @@ const aiAdvisorPrompt = ai.definePrompt({
   name: 'aiAdvisorPrompt',
   input: { schema: AiAdvisorInputSchema },
   output: { schema: AiAdvisorOutputSchema },
+  tools: [getStockRealtimeMetricsTool],
   prompt: `You are TheDigiOcean's Elite AI Advisor Panel. Analyze the symbol {{{symbol}}} for a {{{timeframe}}} horizon.
 
-Provide three distinct perspectives from your resident experts:
+First, use the getStockRealtimeMetrics tool to get the latest technical and institutional data for {{{symbol}}}.
+
+Provide three distinct perspectives from your resident experts based on the real-time data:
 1. **The Quant Master**: Focus on numbers, RSI, Volatility, and Probabilities.
 2. **The Sentiment Guru**: Focus on FII/DII data, News, and Market Psychology.
 3. **The Trend Strategist**: Focus on Price Action, S/R levels, and Volume.

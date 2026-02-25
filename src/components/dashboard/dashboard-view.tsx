@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShieldAlert, Zap, Activity, Radio, TrendingUp, 
   Sparkles, BrainCircuit, Eye, XCircle, 
   ShoppingCart, ChevronRight, ChevronLeft,
   ArrowUpRight, ArrowDownRight, Power,
-  BarChart3, Target, Info
+  BarChart3, Target, Info,
+  AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,7 @@ import {
   addDocumentNonBlocking,
   updateDocumentNonBlocking
 } from '@/firebase';
-import { collection, query, orderBy, limit, where, doc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where, doc, Timestamp } from 'firebase/firestore';
 
 const FO_STRATEGIES = [
   {
@@ -63,19 +64,6 @@ const FO_STRATEGIES = [
     confidence: 81,
     direction: 'SELL',
     entryPrice: 22400
-  },
-  {
-    id: 'reliance-breakout',
-    symbol: 'RELIANCE',
-    name: 'Long Straddle',
-    expiry: 'MAR END',
-    badge: 'EVENT SPECIAL',
-    description: 'High volatility expected ahead of results. Expecting a 3-5% move in either direction.',
-    maxProfit: 'Unlimited',
-    maxLoss: '₹6,500',
-    confidence: 79,
-    direction: 'BUY',
-    entryPrice: 2980
   }
 ];
 
@@ -91,30 +79,6 @@ const AI_RECOMMENDED_SIGNALS = [
     stoploss: 2910.00,
     confidence: 88,
     qty: 10
-  },
-  {
-    id: 'sig-tcs',
-    symbol: 'TCS',
-    segment: 'EQUITY',
-    direction: 'BUY',
-    type: 'VWAP Reversal',
-    entry: 4120.00,
-    target: 4200.00,
-    stoploss: 4080.00,
-    confidence: 82,
-    qty: 5
-  },
-  {
-    id: 'sig-infy',
-    symbol: 'INFY',
-    segment: 'EQUITY',
-    direction: 'SELL',
-    type: 'Resistance Rejection',
-    entry: 1640.00,
-    target: 1580.00,
-    stoploss: 1665.00,
-    confidence: 75,
-    qty: 20
   },
   {
     id: 'sig-nifty-ce',
@@ -139,18 +103,6 @@ const AI_RECOMMENDED_SIGNALS = [
     stoploss: 175.00,
     confidence: 79,
     qty: 15
-  },
-  {
-    id: 'sig-fn-ce',
-    symbol: 'FINNIFTY 21600 CE',
-    segment: 'F&O',
-    direction: 'BUY',
-    type: 'Momentum',
-    entry: 85.00,
-    target: 125.00,
-    stoploss: 65.00,
-    confidence: 85,
-    qty: 40
   }
 ];
 
@@ -166,6 +118,7 @@ export function Dashboard() {
     setMounted(true);
   }, []);
 
+  // Fetch FII/DII for Conviction
   const fiiDiiQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'fii_dii_data'), orderBy('date', 'desc'), limit(1));
@@ -173,44 +126,79 @@ export function Dashboard() {
   const { data: fiiDiiDocs } = useCollection(fiiDiiQuery);
   const latestFiiDii = fiiDiiDocs?.[0];
 
-  const tradesQuery = useMemoFirebase(() => {
+  // Fetch All Today's Trades for Stats
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayIso = today.toISOString();
+
+  const allTradesQuery = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
     return query(
       collection(firestore, 'users', userId, 'trades'),
-      where('status', '==', 'OPEN')
+      where('openedAt', '>=', todayIso)
     );
-  }, [firestore, userId]);
-  const { data: openPositions } = useCollection(tradesQuery);
+  }, [firestore, userId, todayIso]);
+  const { data: todayTrades } = useCollection(allTradesQuery);
 
-  const algosQuery = useMemoFirebase(() => {
-    if (!firestore || !userId) return null;
-    return query(
-      collection(firestore, 'users', userId, 'algos'),
-      where('status', '==', 'Deployed')
-    );
-  }, [firestore, userId]);
-  const { data: activeAlgos } = useCollection(algosQuery);
+  // Compute Dashboard Stats
+  const stats = useMemo(() => {
+    if (!todayTrades) return { sessionPnL: 0, openCount: 0, totalTrades: 0, riskFactor: 0 };
+    
+    const openCount = todayTrades.filter(t => t.status === 'OPEN').length;
+    const closedTrades = todayTrades.filter(t => t.status === 'CLOSED');
+    const sessionPnL = closedTrades.reduce((acc, curr) => acc + (curr.pnl || 0), 0);
+    
+    // Risk Factor: Percentage of daily trade limit (e.g. 10 trades)
+    const riskFactor = Math.min((todayTrades.length / 10) * 100, 100);
 
-  const totalPnL = 2450.50;
-  const marketBias = "BULLISH";
-  
-  const getAiRecommendation = () => {
-    if (marketBias === "BULLISH") return { text: "BUY", color: "text-bull", bg: "bg-bull/10" };
-    if (marketBias === "BEARISH") return { text: "SELL", color: "text-bear", bg: "bg-bear/10" };
-    return { text: "WATCH", color: "text-gold", bg: "bg-gold/10" };
-  };
-  const recommendation = getAiRecommendation();
+    return {
+      sessionPnL,
+      openCount,
+      totalTrades: todayTrades.length,
+      riskFactor
+    };
+  }, [todayTrades]);
 
+  // Conviction Logic
   const getConviction = () => {
-    if (!latestFiiDii) return "NEUTRAL";
-    const net = (latestFiiDii.fiiCashNet || 0) + (latestFiiDii.diiNet || 0);
-    if (net > 2000) return "HIGHLY BULLISH";
-    if (net > 500) return "BULLISH";
-    if (net < -2000) return "HIGHLY BEARISH";
-    if (net < -500) return "BEARISH";
-    return "NEUTRAL";
+    if (!latestFiiDii) return "STABLE";
+    const net = (latestFiiDii.fiiCashNet || 0);
+    if (net > 2000) return "VERY BULLISH";
+    if (net > 0) return "MODERATELY BULLISH";
+    if (net < -2000) return "VERY BEARISH";
+    return "CAUTIOUS";
   };
   const conviction = getConviction();
+
+  // Guardian Expression and Message Logic
+  const guardianStatus = useMemo(() => {
+    if (stats.riskFactor > 80) {
+      return { 
+        expression: 'Sweating' as const, 
+        message: "Warning! You've reached 80% of your daily trade limit. Risk of emotional fatigue is high. Consider cooling off.",
+        status: 'CRITICAL'
+      };
+    }
+    if (stats.openCount > 3) {
+      return { 
+        expression: 'Thinking' as const, 
+        message: "You have several open positions. Focus on managing these before scanning for new signals.",
+        status: 'HEAVY'
+      };
+    }
+    if (stats.sessionPnL < -2000) {
+      return { 
+        expression: 'Sad' as const, 
+        message: "Tough session so far. Stick to your stop-losses. Digi is watching for revenge patterns.",
+        status: 'CAUTION'
+      };
+    }
+    return { 
+      expression: 'Coaching' as const, 
+      message: "Session is stable. Your execution timing is aligned with institutional flows. Stay disciplined!",
+      status: 'SECURE'
+    };
+  }, [stats]);
 
   const executeTrade = (tradeData: { symbol: string, side: string, segment: string, qty: number, price: number, strategy: string }) => {
     if (!firestore || !userId) return;
@@ -231,19 +219,23 @@ export function Dashboard() {
     });
   };
 
-  const handleExitPosition = (tradeId: string) => {
+  const handleExitPosition = (tradeId: string, entryPrice: number) => {
     if (!firestore || !userId) return;
     const tradeRef = doc(firestore, 'users', userId, 'trades', tradeId);
+    
+    // Simulate exit price based on direction
+    const exitPrice = entryPrice * 1.02; // Mock 2% gain for UI demo
+    const pnl = (exitPrice - entryPrice) * 10; // Qty 10 mock
+
     updateDocumentNonBlocking(tradeRef, {
       status: 'CLOSED',
-      exitPrice: 22500.50, 
+      exitPrice,
+      pnl: parseFloat(pnl.toFixed(2)),
+      pnlPct: 2.0,
       closedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
   };
-
-  const nextStrategy = () => setStrategyIndex((prev) => (prev + 1) % FO_STRATEGIES.length);
-  const prevStrategy = () => setStrategyIndex((prev) => (prev - 1 + FO_STRATEGIES.length) % FO_STRATEGIES.length);
 
   const currentStrategy = FO_STRATEGIES[strategyIndex];
 
@@ -251,46 +243,46 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8 pb-10">
-      {/* Dynamic Header */}
+      {/* Real-time Header Stats */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <MascotDigi expression="Happy" size="md" />
+          <MascotDigi expression={guardianStatus.expression} size="md" />
           <div>
             <h1 className="text-3xl font-headline font-extrabold tracking-tight">
               AI Command Center 🌊
             </h1>
             <p className="text-muted-foreground mt-1 flex items-center gap-2">
-              <ShieldAlert className="w-3.5 h-3.5 text-bull" />
-              Risk Guardian Active • Sentiment: {marketBias}
+              <ShieldAlert className={cn("w-3.5 h-3.5", guardianStatus.status === 'SECURE' ? "text-bull" : "text-bear")} />
+              Risk Guard Status: {guardianStatus.status} • NSE/BSE Live
             </p>
           </div>
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[160px]">
-            <div className={cn("mono-font text-2xl font-extrabold", totalPnL >= 0 ? "text-bull" : "text-bear")}>
-              ₹{totalPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          <Card className="flex flex-col items-end border rounded-2xl p-4 shadow-sm min-w-[160px] bg-card">
+            <div className={cn("mono-font text-2xl font-extrabold", stats.sessionPnL >= 0 ? "text-bull" : "text-bear")}>
+              ₹{stats.sessionPnL.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Daily Session P&L</p>
-          </div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Session Score (P&L)</p>
+          </Card>
 
-          <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[140px]">
+          <Card className="flex flex-col items-end border rounded-2xl p-4 shadow-sm min-w-[140px] bg-card">
             <div className="mono-font text-2xl font-extrabold text-primary">
-              {openPositions?.length || 0}
+              {stats.openCount}
             </div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Open Positions</p>
-          </div>
+          </Card>
 
-          <div className="flex flex-col items-end bg-card border rounded-2xl p-4 shadow-sm min-w-[140px]">
+          <Card className="flex flex-col items-end border rounded-2xl p-4 shadow-sm min-w-[140px] bg-card">
             <div className="mono-font text-2xl font-extrabold text-gold">
-              {activeAlgos?.length || 0}
+              {stats.totalTrades}
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Active Algos</p>
-          </div>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Daily Trade Count</p>
+          </Card>
         </div>
       </div>
 
-      {/* Intelligence Strip */}
+      {/* Institutional Conviction Strip */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-none shadow-sm bg-bull/5">
           <CardContent className="p-4 flex items-center gap-3">
@@ -298,7 +290,7 @@ export function Dashboard() {
               <Activity className="w-4 h-4" />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase">FII/DII Conviction</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">FII/DII Net Flow</p>
               <p className="text-sm font-bold text-bull">{conviction}</p>
             </div>
           </CardContent>
@@ -310,11 +302,11 @@ export function Dashboard() {
               <Sparkles className="w-4 h-4" />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase">AI Strategy</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">AI Recommended Bias</p>
               <div className="flex items-center gap-2">
-                <p className={cn("text-sm font-bold", recommendation.color)}>{recommendation.text}</p>
-                <Badge variant="outline" className={cn("text-[8px] font-bold h-4 px-1 border-none", recommendation.bg, recommendation.color)}>
-                  SUGGESTED
+                <p className="text-sm font-bold text-bull">BULLISH</p>
+                <Badge variant="outline" className="text-[8px] font-bold h-4 px-1 border-none bg-bull/10 text-bull">
+                  HIGH CONFIDENCE
                 </Badge>
               </div>
             </div>
@@ -324,11 +316,11 @@ export function Dashboard() {
         <Card className="border-none shadow-sm bg-gold/5">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-gold/10 text-gold">
-              <TrendingUp className="w-4 h-4" />
+              <Target className="w-4 h-4" />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase">Market Vibe</p>
-              <p className="text-sm font-bold text-gold">{marketBias}</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase">Active Guardrails</p>
+              <p className="text-sm font-bold text-gold">REVENGE SHIELD ACTIVE</p>
             </div>
           </CardContent>
         </Card>
@@ -337,23 +329,77 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
           
-          {/* AI F&O Suggestion Section */}
+          {/* Active Positions UI */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-headline font-bold flex items-center gap-2">
-                <BrainCircuit className="w-5 h-5 text-primary" />
-                AI F&O Intelligence
+                <ShoppingCart className="w-5 h-5 text-primary" />
+                Live Portfolio Management
               </h3>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prevStrategy}>
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-[10px] font-bold text-muted-foreground">{strategyIndex + 1} / {FO_STRATEGIES.length}</span>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextStrategy}>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
+              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-bull border-bull/20 bg-bull/5">
+                {stats.openCount} LIVE TRADES
+              </Badge>
             </div>
+            <div className="space-y-3">
+              {todayTrades?.filter(t => t.status === 'OPEN').map((position) => (
+                <Card key={position.id} className="border-none shadow-sm hover:shadow-md transition-all overflow-hidden bg-white">
+                  <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs",
+                        position.side === 'BUY' ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+                      )}>
+                        {position.side === 'BUY' ? 'B' : 'S'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">{position.symbol}</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">
+                          {position.qty} QTY • ENTRY ₹{position.entryPrice}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 flex items-center justify-center gap-8 w-full md:w-auto">
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Segment</p>
+                        <Badge variant="secondary" className="text-[9px] font-bold">{position.segment}</Badge>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Account Risk</p>
+                        <p className="text-xs font-bold text-primary">0.5%</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 md:flex-none h-9 text-[11px] font-bold gap-1.5 border-bear/20 text-bear hover:bg-bear hover:text-white"
+                        onClick={() => handleExitPosition(position.id, position.entryPrice)}
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        AUTO-EXIT (MOCK)
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {stats.openCount === 0 && (
+                <div className="py-12 border-2 border-dashed rounded-3xl text-center space-y-3 bg-muted/5">
+                  <Info className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">No active market exposure detected</p>
+                  <Button variant="link" className="text-[10px] font-bold uppercase text-primary">SCAN FOR NEW SIGNALS</Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* AI F&O Intel - Rotating Cards */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-headline font-bold flex items-center gap-2">
+              <BrainCircuit className="w-5 h-5 text-primary" />
+              AI F&O Pro Intelligence
+            </h3>
             <Card className="border-primary/20 bg-primary/5 shadow-purple overflow-hidden">
               <CardContent className="p-0">
                 <div className="grid grid-cols-1 md:grid-cols-2">
@@ -366,21 +412,11 @@ export function Dashboard() {
                     <p className="text-sm text-muted-foreground leading-relaxed min-h-[60px]">
                       {currentStrategy.description}
                     </p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-background/50 p-3 rounded-xl border border-primary/5">
-                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Max Profit</p>
-                        <p className="text-sm font-bold text-bull">{currentStrategy.maxProfit}</p>
-                      </div>
-                      <div className="bg-background/50 p-3 rounded-xl border border-primary/5">
-                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Max Loss</p>
-                        <p className="text-sm font-bold text-bear">{currentStrategy.maxLoss}</p>
-                      </div>
-                    </div>
                   </div>
                   <div className="p-6 bg-white/40 backdrop-blur-sm flex flex-col justify-center gap-4">
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-muted-foreground uppercase">AI Confidence</span>
+                        <span className="text-muted-foreground uppercase">AI Conviction Weight</span>
                         <span className="text-primary">{currentStrategy.confidence}%</span>
                       </div>
                       <Progress value={currentStrategy.confidence} className="h-1.5" />
@@ -397,247 +433,140 @@ export function Dashboard() {
                       })}
                     >
                       <Zap className="w-4 h-4 fill-current" />
-                      QUICK TRADE EXECUTION
+                      DEPLOY STRATEGY
                     </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
+        </div>
 
-          {/* Active Positions Manager */}
-          {openPositions && openPositions.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-headline font-bold flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5 text-primary" />
-                  Active Positions
-                </h3>
-                <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-bull border-bull/20 bg-bull/5">
-                  {openPositions.length} OPEN
-                </Badge>
+        {/* Dynamic Risk Guardian Sidebar */}
+        <div className="lg:col-span-4 space-y-6">
+          <Card className="shadow-sm border-primary/10 overflow-hidden">
+            <div className={cn(
+              "px-4 py-2 flex items-center justify-between text-white font-bold text-[10px] uppercase tracking-widest",
+              guardianStatus.status === 'CRITICAL' ? "bg-bear animate-pulse" : "bg-primary"
+            )}>
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                AI Risk Guardian
               </div>
-              <div className="space-y-3">
-                {openPositions.map((position) => (
-                  <Card key={position.id} className="border-none shadow-sm hover:shadow-md transition-all overflow-hidden">
-                    <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 w-full md:w-auto">
-                        <div className={cn(
-                          "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs",
-                          position.side === 'BUY' ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
-                        )}>
-                          {position.side === 'BUY' ? 'B' : 'S'}
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold">{position.symbol}</p>
-                          <p className="text-[10px] font-bold text-muted-foreground uppercase">
-                            {position.qty} QTY • AVG ₹{position.entryPrice}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex-1 flex items-center justify-center gap-8 w-full md:w-auto">
-                        <div className="text-center">
-                          <p className="text-[9px] font-bold text-muted-foreground uppercase">Live P&L</p>
-                          <p className={cn("text-sm font-bold mono-font", totalPnL >= 0 ? "text-bull" : "text-bear")}>
-                            +₹1,240.00
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[9px] font-bold text-muted-foreground uppercase">Status</p>
-                          <Badge variant="outline" className="text-[9px] font-bold border-bull/20 text-bull">ACTIVE</Badge>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 w-full md:w-auto">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="flex-1 md:flex-none h-9 text-[11px] font-bold gap-1.5 border-bear/20 text-bear hover:bg-bear hover:text-white"
-                          onClick={() => handleExitPosition(position.id)}
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          EXIT NOW
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <Badge variant="outline" className="text-[9px] border-white/40 text-white font-bold h-5 uppercase">
+                {guardianStatus.status}
+              </Badge>
             </div>
-          )}
+            <CardContent className="p-6 space-y-6">
+              <div className="flex items-start gap-4">
+                <MascotDigi expression={guardianStatus.expression} size="sm" className="shrink-0" />
+                <div className="bg-muted/40 p-3 rounded-2xl rounded-tl-none border border-primary/5 text-[11px] leading-relaxed font-medium italic">
+                  "{guardianStatus.message}"
+                </div>
+              </div>
+              
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
+                    <span>Session Capacity (Trade Limit)</span>
+                    <span className={cn(stats.riskFactor > 80 ? "text-bear" : "text-primary")}>
+                      {stats.totalTrades} / 10
+                    </span>
+                  </div>
+                  <Progress value={stats.riskFactor} className="h-1.5" />
+                </div>
 
-          {/* Live AI Signal Center */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-background rounded-xl border border-primary/5 flex flex-col items-center text-center">
+                    <p className="text-[8px] font-bold text-muted-foreground uppercase">Revenge Risk</p>
+                    <p className={cn("text-xs font-extrabold mt-1", stats.riskFactor > 70 ? "text-bear" : "text-bull")}>
+                      {stats.riskFactor > 70 ? "HIGH" : "LOW"}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-background rounded-xl border border-primary/5 flex flex-col items-center text-center">
+                    <p className="text-[8px] font-bold text-muted-foreground uppercase">Fatigue Level</p>
+                    <p className={cn("text-xs font-extrabold mt-1", stats.totalTrades > 5 ? "text-gold" : "text-bull")}>
+                      {stats.totalTrades > 5 ? "MODERATE" : "LOW"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick AI Signal Stream */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-headline font-bold flex items-center gap-2">
-                <Radio className="w-5 h-5 text-primary animate-pulse" />
-                Live AI Signals
-              </h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {AI_RECOMMENDED_SIGNALS.map((signal) => (
-                <Card key={signal.id} className="group relative overflow-hidden border-primary/5 hover:border-primary/20 transition-all bg-card/50 backdrop-blur-sm">
-                  <div className={cn(
-                    "absolute top-0 left-0 w-1 h-full",
-                    signal.direction === 'BUY' ? "bg-bull" : "bg-bear"
-                  )} />
-                  <CardContent className="p-4 space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-bold">{signal.symbol}</p>
-                          <Badge variant="outline" className="text-[8px] font-bold h-4 px-1 border-muted-foreground/20 text-muted-foreground">
-                            {signal.segment}
-                          </Badge>
-                        </div>
-                        <p className="text-[9px] font-bold text-muted-foreground uppercase">{signal.type}</p>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-gold" />
+              Top AI Alpha Signals
+            </h3>
+            <div className="space-y-3">
+              {AI_RECOMMENDED_SIGNALS.map(s => (
+                <Card key={s.id} className="border-none shadow-sm hover:border-primary/20 transition-all cursor-pointer bg-white">
+                  <CardContent className="p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px]",
+                        s.direction === 'BUY' ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
+                      )}>
+                        {s.symbol.charAt(0)}
                       </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-primary">
-                          <BrainCircuit className="w-3 h-3" />
-                          {signal.confidence}%
-                        </div>
+                      <div>
+                        <p className="text-xs font-bold">{s.symbol}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase">{s.type}</p>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 bg-muted/20 p-2 rounded-lg">
+                    <div className="text-right flex items-center gap-3">
                       <div>
-                        <p className="text-[8px] text-muted-foreground font-bold uppercase">Entry Target</p>
-                        <p className="text-xs font-bold mono-font">₹{signal.entry}</p>
+                        <p className="text-[10px] font-extrabold mono-font text-bull">₹{s.entry}</p>
+                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{s.confidence}% Match</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-[8px] text-muted-foreground font-bold uppercase">Target 1</p>
-                        <p className="text-xs font-bold mono-font text-bull">₹{signal.target}</p>
-                      </div>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary"
+                        onClick={() => executeTrade({
+                          symbol: s.symbol,
+                          side: s.direction,
+                          segment: s.segment,
+                          qty: s.qty,
+                          price: s.entry,
+                          strategy: 'AI Alpha Signal'
+                        })}
+                      >
+                        <Zap className="w-3.5 h-3.5 fill-current" />
+                      </Button>
                     </div>
-
-                    <Button 
-                      size="sm" 
-                      className="w-full h-8 text-[10px] font-bold gap-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-white border-none shadow-none"
-                      onClick={() => executeTrade({
-                        symbol: signal.symbol,
-                        side: signal.direction,
-                        segment: signal.segment,
-                        qty: signal.qty,
-                        price: signal.entry,
-                        strategy: 'AI Signal: ' + signal.type
-                      })}
-                    >
-                      <Zap className="w-3 h-3 fill-current" />
-                      QUICK TRADE
-                    </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </div>
-        </div>
 
-        {/* Right Sidebar */}
-        <div className="lg:col-span-4 space-y-6">
-          <Card className="shadow-purple border-primary/10 bg-gradient-to-br from-primary/[0.03] to-transparent">
+          {/* Market Sentiment Barometer (Visual) */}
+          <Card className="shadow-sm border-gold/10 bg-gradient-to-br from-gold/[0.02] to-transparent overflow-hidden">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-headline font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                Digi's Morning Intel
+              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-gold flex items-center gap-2">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Institutional Sentiment
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-bold p-2 bg-background/50 rounded-lg border border-primary/5">
-                  <span className="text-muted-foreground uppercase">Conviction</span>
-                  <span className={cn(
-                    "font-bold uppercase",
-                    conviction.includes('BULLISH') ? "text-bull" : conviction.includes('BEARISH') ? "text-bear" : "text-gold"
-                  )}>
-                    {conviction}
-                  </span>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-center h-20 relative">
+                <div className="text-center">
+                  <p className="text-2xl font-black text-gold tracking-tighter uppercase">ACCUMULATION</p>
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1 italic">Institutions are holding support</p>
                 </div>
               </div>
-              <div className="bg-muted/30 p-4 rounded-xl text-[11px] leading-relaxed text-muted-foreground font-medium italic border border-primary/5">
-                "FII conviction is high in large-caps today. Support at 22,350 is strong. Avoid aggressive shorts unless 22,280 breaks."
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-primary/10 overflow-hidden">
-            <div className="bg-primary px-4 py-2 flex items-center justify-between text-white">
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                Risk Guardian
-              </div>
-              <Badge variant="outline" className="text-[9px] border-white/40 text-white font-bold h-5 uppercase">Secure</Badge>
-            </div>
-            <CardContent className="p-6 space-y-6">
-              <div className="flex items-center gap-4">
-                <MascotDigi expression="Coaching" size="sm" className="shrink-0" />
-                <div className="bg-muted/40 p-3 rounded-2xl rounded-tl-none border border-primary/5 text-[11px] leading-relaxed font-medium italic">
-                  "Great discipline today! No signs of FOMO. Stick to your targets."
+              <div className="pt-2 border-t border-gold/10 grid grid-cols-2 gap-2">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase">Advancing</span>
+                  <span className="text-[9px] font-bold text-bull">1,240</span>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
-                  <span>Daily Loss Cap</span>
-                  <span className="text-bull">₹0 / ₹5,000</span>
+                <div className="flex items-center justify-between px-2 border-l">
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase">Declining</span>
+                  <span className="text-[9px] font-bold text-bear">680</span>
                 </div>
-                <Progress value={32} className="h-2" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* AI F&O Pro Recommendations */}
-          <Card className="shadow-sm border-gold/10 overflow-hidden bg-gradient-to-br from-gold/[0.02] to-transparent">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-headline font-bold uppercase tracking-widest text-gold flex items-center gap-2">
-                <BarChart3 className="w-4 h-4" />
-                AI F&O Pro Insights
-              </CardTitle>
-              <CardDescription className="text-[10px] uppercase font-bold text-muted-foreground">
-                Advanced Strike & OI Analytics
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex items-center gap-3 p-3 bg-card border border-gold/5 rounded-xl">
-                  <div className="p-2 rounded-lg bg-gold/10 text-gold">
-                    <Target className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase">NIFTY Max Pain</p>
-                    <p className="text-xs font-extrabold mono-font">22,450.00</p>
-                    <p className="text-[8px] text-muted-foreground font-medium mt-0.5">Expect consolidation near this strike.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 bg-card border border-primary/5 rounded-xl">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                    <TrendingUp className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase">OI Buildup Alert</p>
-                    <p className="text-xs font-extrabold mono-font text-bear">Resistance at 22,600</p>
-                    <p className="text-[8px] text-muted-foreground font-medium mt-0.5">Heavy call writing detected at 22.6k strike.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 p-3 bg-card border border-bull/5 rounded-xl">
-                  <div className="p-2 rounded-lg bg-bull/10 text-bull">
-                    <Activity className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase">PCR Trend</p>
-                    <p className="text-xs font-extrabold mono-font text-bull">1.28 (Bullish)</p>
-                    <p className="text-[8px] text-muted-foreground font-medium mt-0.5">Bullish divergence on the 15m timeframe.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 bg-gold/5 border border-gold/10 rounded-xl flex gap-3">
-                <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" />
-                <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-                  "Pro-Tip: When Max Pain shifts upwards during the live session, it confirms institutional strength. Look for Bull Call Spreads."
-                </p>
               </div>
             </CardContent>
           </Card>

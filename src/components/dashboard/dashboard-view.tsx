@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -7,7 +8,7 @@ import {
   ShoppingCart, ChevronRight, ChevronLeft,
   ArrowUpRight, ArrowDownRight, Power,
   BarChart3, Target, Info,
-  AlertTriangle
+  AlertTriangle, Lock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,8 @@ import {
   addDocumentNonBlocking,
   updateDocumentNonBlocking
 } from '@/firebase';
-import { collection, query, orderBy, limit, where, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where, doc, getDocs } from 'firebase/firestore';
+import { toast } from '@/hooks/use-toast';
 
 const FO_STRATEGIES = [
   {
@@ -51,19 +53,6 @@ const FO_STRATEGIES = [
     confidence: 76,
     direction: 'SELL',
     entryPrice: 48200
-  },
-  {
-    id: 'nifty-iron-condor',
-    symbol: 'NIFTY',
-    name: 'Short Iron Condor',
-    expiry: '21 MAR',
-    badge: 'RANGE-BOUND',
-    description: 'VIX is stabilizing. NIFTY expected to stay between 22,200 - 22,600. Strategy: Multi-leg credit spread.',
-    maxProfit: '₹5,600',
-    maxLoss: '₹2,400',
-    confidence: 81,
-    direction: 'SELL',
-    entryPrice: 22400
   }
 ];
 
@@ -91,18 +80,6 @@ const AI_RECOMMENDED_SIGNALS = [
     stoploss: 120.00,
     confidence: 91,
     qty: 50
-  },
-  {
-    id: 'sig-bn-pe',
-    symbol: 'BANKNIFTY 48200 PE',
-    segment: 'F&O',
-    direction: 'BUY',
-    type: 'Trend Ride',
-    entry: 210.50,
-    target: 280.00,
-    stoploss: 175.00,
-    confidence: 79,
-    qty: 15
   }
 ];
 
@@ -118,6 +95,20 @@ export function Dashboard() {
     setMounted(true);
   }, []);
 
+  // Fetch Active Locks (within 2 hours)
+  const locksQuery = useMemoFirebase(() => {
+    if (!firestore || !userId) return null;
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    return query(
+      collection(firestore, 'users', userId, 'risk_locks'),
+      where('lockedAt', '>=', twoHoursAgo),
+      orderBy('lockedAt', 'desc'),
+      limit(1)
+    );
+  }, [firestore, userId]);
+  const { data: activeLocks } = useCollection(locksQuery);
+  const isLocked = activeLocks && activeLocks.length > 0;
+
   // Fetch FII/DII for Conviction
   const fiiDiiQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -126,7 +117,7 @@ export function Dashboard() {
   const { data: fiiDiiDocs } = useCollection(fiiDiiQuery);
   const latestFiiDii = fiiDiiDocs?.[0];
 
-  // Fetch All Today's Trades for Stats
+  // Fetch All Today's Trades
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayIso = today.toISOString();
@@ -135,73 +126,71 @@ export function Dashboard() {
     if (!firestore || !userId) return null;
     return query(
       collection(firestore, 'users', userId, 'trades'),
-      where('openedAt', '>=', todayIso)
+      where('openedAt', '>=', todayIso),
+      orderBy('openedAt', 'desc')
     );
   }, [firestore, userId, todayIso]);
   const { data: todayTrades } = useCollection(allTradesQuery);
 
-  // Compute Dashboard Stats
   const stats = useMemo(() => {
     if (!todayTrades) return { sessionPnL: 0, openCount: 0, totalTrades: 0, riskFactor: 0 };
-    
     const openCount = todayTrades.filter(t => t.status === 'OPEN').length;
     const closedTrades = todayTrades.filter(t => t.status === 'CLOSED');
     const sessionPnL = closedTrades.reduce((acc, curr) => acc + (curr.pnl || 0), 0);
-    
-    // Risk Factor: Percentage of daily trade limit (e.g. 10 trades)
     const riskFactor = Math.min((todayTrades.length / 10) * 100, 100);
-
-    return {
-      sessionPnL,
-      openCount,
-      totalTrades: todayTrades.length,
-      riskFactor
-    };
+    return { sessionPnL, openCount, totalTrades: todayTrades.length, riskFactor };
   }, [todayTrades]);
 
-  // Conviction Logic
-  const getConviction = () => {
-    if (!latestFiiDii) return "STABLE";
-    const net = (latestFiiDii.fiiCashNet || 0);
-    if (net > 2000) return "VERY BULLISH";
-    if (net > 0) return "MODERATELY BULLISH";
-    if (net < -2000) return "VERY BEARISH";
-    return "CAUTIOUS";
-  };
-  const conviction = getConviction();
-
-  // Guardian Expression and Message Logic
   const guardianStatus = useMemo(() => {
+    if (isLocked) {
+      return { 
+        expression: 'Locked' as const, 
+        message: "TRADING DISABLED: High-frequency overtrading detected. 2-hour cooldown in progress.",
+        status: 'LOCKED'
+      };
+    }
     if (stats.riskFactor > 80) {
       return { 
         expression: 'Sweating' as const, 
-        message: "Warning! You've reached 80% of your daily trade limit. Risk of emotional fatigue is high. Consider cooling off.",
+        message: "Warning! You've reached 80% of your daily trade limit. Risk of emotional fatigue is high.",
         status: 'CRITICAL'
-      };
-    }
-    if (stats.openCount > 3) {
-      return { 
-        expression: 'Thinking' as const, 
-        message: "You have several open positions. Focus on managing these before scanning for new signals.",
-        status: 'HEAVY'
-      };
-    }
-    if (stats.sessionPnL < -2000) {
-      return { 
-        expression: 'Sad' as const, 
-        message: "Tough session so far. Stick to your stop-losses. Digi is watching for revenge patterns.",
-        status: 'CAUTION'
       };
     }
     return { 
       expression: 'Coaching' as const, 
-      message: "Session is stable. Your execution timing is aligned with institutional flows. Stay disciplined!",
+      message: "Session is stable. Your execution timing is aligned with institutional flows.",
       status: 'SECURE'
     };
-  }, [stats]);
+  }, [stats, isLocked]);
 
-  const executeTrade = (tradeData: { symbol: string, side: string, segment: string, qty: number, price: number, strategy: string }) => {
-    if (!firestore || !userId) return;
+  const executeTrade = async (tradeData: { symbol: string, side: string, segment: string, qty: number, price: number, strategy: string }) => {
+    if (!firestore || !userId || isLocked) return;
+
+    // Check for high-frequency lock (5 trades in 1 minute)
+    if (todayTrades && todayTrades.length >= 4) {
+      const recent = todayTrades.slice(0, 4);
+      const lastTradeTime = new Date(recent[0].openedAt).getTime();
+      const fourthTradeTime = new Date(recent[3].openedAt).getTime();
+      
+      if (Date.now() - fourthTradeTime < 60000) {
+        toast({
+          variant: "destructive",
+          title: "HIGH FREQUENCY LOCK TRIGGERED",
+          description: "You've placed 5 trades in under a minute. Trading disabled for 2 hours."
+        });
+        
+        addDocumentNonBlocking(collection(firestore, 'users', userId, 'risk_locks'), {
+          userId,
+          lockReason: 'High Frequency (5 trades / min)',
+          lockType: 'Auto',
+          lockedAt: new Date().toISOString(),
+          pnlAtLock: stats.sessionPnL,
+          tradesAtLock: stats.totalTrades + 1
+        });
+        return;
+      }
+    }
+
     const tradesRef = collection(firestore, 'users', userId, 'trades');
     addDocumentNonBlocking(tradesRef, {
       userId,
@@ -222,10 +211,8 @@ export function Dashboard() {
   const handleExitPosition = (tradeId: string, entryPrice: number) => {
     if (!firestore || !userId) return;
     const tradeRef = doc(firestore, 'users', userId, 'trades', tradeId);
-    
-    // Simulate exit price based on direction
-    const exitPrice = entryPrice * 1.02; // Mock 2% gain for UI demo
-    const pnl = (exitPrice - entryPrice) * 10; // Qty 10 mock
+    const exitPrice = entryPrice * 1.02;
+    const pnl = (exitPrice - entryPrice) * 10;
 
     updateDocumentNonBlocking(tradeRef, {
       status: 'CLOSED',
@@ -243,7 +230,17 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8 pb-10">
-      {/* Real-time Header Stats */}
+      {isLocked && (
+        <div className="bg-bear text-white p-4 rounded-2xl flex items-center gap-4 shadow-lg animate-in fade-in slide-in-from-top-4">
+          <Lock className="w-6 h-6 shrink-0" />
+          <div className="flex-1">
+            <p className="font-bold uppercase tracking-tight">System Lockdown Active</p>
+            <p className="text-xs opacity-90">High-frequency trading detected. Your execution bridge is suspended for 2 hours to prevent emotional slippage.</p>
+          </div>
+          <Badge variant="outline" className="text-white border-white/40">2H COOLDOWN</Badge>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <MascotDigi expression={guardianStatus.expression} size="md" />
@@ -282,54 +279,8 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Institutional Conviction Strip */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-none shadow-sm bg-bull/5">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-bull/10 text-bull">
-              <Activity className="w-4 h-4" />
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase">FII/DII Net Flow</p>
-              <p className="text-sm font-bold text-bull">{conviction}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-primary/5">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase">AI Recommended Bias</p>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-bull">BULLISH</p>
-                <Badge variant="outline" className="text-[8px] font-bold h-4 px-1 border-none bg-bull/10 text-bull">
-                  HIGH CONFIDENCE
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-sm bg-gold/5">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gold/10 text-gold">
-              <Target className="w-4 h-4" />
-            </div>
-            <div className="flex-1">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase">Active Guardrails</p>
-              <p className="text-sm font-bold text-gold">REVENGE SHIELD ACTIVE</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
-          
-          {/* Active Positions UI */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-headline font-bold flex items-center gap-2">
@@ -358,218 +309,126 @@ export function Dashboard() {
                         </p>
                       </div>
                     </div>
-                    
-                    <div className="flex-1 flex items-center justify-center gap-8 w-full md:w-auto">
-                      <div className="text-center">
-                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Segment</p>
-                        <Badge variant="secondary" className="text-[9px] font-bold">{position.segment}</Badge>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Account Risk</p>
-                        <p className="text-xs font-bold text-primary">0.5%</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1 md:flex-none h-9 text-[11px] font-bold gap-1.5 border-bear/20 text-bear hover:bg-bear hover:text-white"
-                        onClick={() => handleExitPosition(position.id, position.entryPrice)}
-                      >
-                        <XCircle className="w-3.5 h-3.5" />
-                        AUTO-EXIT (MOCK)
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-9 text-[11px] font-bold gap-1.5 border-bear/20 text-bear hover:bg-bear hover:text-white"
+                      onClick={() => handleExitPosition(position.id, position.entryPrice)}
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      AUTO-EXIT
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
-              {stats.openCount === 0 && (
-                <div className="py-12 border-2 border-dashed rounded-3xl text-center space-y-3 bg-muted/5">
-                  <Info className="w-8 h-8 text-muted-foreground/30 mx-auto" />
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">No active market exposure detected</p>
-                  <Button variant="link" className="text-[10px] font-bold uppercase text-primary">SCAN FOR NEW SIGNALS</Button>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* AI F&O Intel - Rotating Cards */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-headline font-bold flex items-center gap-2">
-              <BrainCircuit className="w-5 h-5 text-primary" />
-              AI F&O Pro Intelligence
-            </h3>
-            <Card className="border-primary/20 bg-primary/5 shadow-purple overflow-hidden">
-              <CardContent className="p-0">
-                <div className="grid grid-cols-1 md:grid-cols-2">
-                  <div className="p-6 space-y-4 border-r border-primary/10">
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-primary/20 text-primary border-none text-[10px] font-bold uppercase">{currentStrategy.badge}</Badge>
-                      <span className="text-xs font-bold text-muted-foreground">EXP: {currentStrategy.expiry}</span>
-                    </div>
-                    <h4 className="text-xl font-bold">{currentStrategy.name}</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed min-h-[60px]">
-                      {currentStrategy.description}
-                    </p>
-                  </div>
-                  <div className="p-6 bg-white/40 backdrop-blur-sm flex flex-col justify-center gap-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-muted-foreground uppercase">AI Conviction Weight</span>
-                        <span className="text-primary">{currentStrategy.confidence}%</span>
-                      </div>
-                      <Progress value={currentStrategy.confidence} className="h-1.5" />
-                    </div>
-                    <Button 
-                      className="w-full h-12 text-sm font-bold gap-2 shadow-purple"
-                      onClick={() => executeTrade({
-                        symbol: currentStrategy.symbol,
-                        side: currentStrategy.direction,
-                        segment: 'F&O',
-                        qty: 50,
-                        price: currentStrategy.entryPrice,
-                        strategy: currentStrategy.name
-                      })}
-                    >
-                      <Zap className="w-4 h-4 fill-current" />
-                      DEPLOY STRATEGY
-                    </Button>
-                  </div>
+          <Card className="border-primary/20 bg-primary/5 shadow-purple overflow-hidden">
+            <CardContent className="p-6 flex flex-col md:flex-row justify-between gap-6">
+              <div className="space-y-4 flex-1">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary/20 text-primary border-none text-[10px] font-bold uppercase">{currentStrategy.badge}</Badge>
+                  <span className="text-xs font-bold text-muted-foreground">EXP: {currentStrategy.expiry}</span>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <h4 className="text-xl font-bold">{currentStrategy.name}</h4>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {currentStrategy.description}
+                </p>
+              </div>
+              <div className="shrink-0 flex flex-col justify-center gap-4">
+                <Button 
+                  className="h-12 px-8 font-bold gap-2 shadow-purple"
+                  disabled={isLocked}
+                  onClick={() => executeTrade({
+                    symbol: currentStrategy.symbol,
+                    side: currentStrategy.direction,
+                    segment: 'F&O',
+                    qty: 50,
+                    price: currentStrategy.entryPrice,
+                    strategy: currentStrategy.name
+                  })}
+                >
+                  <Zap className="w-4 h-4 fill-current" />
+                  {isLocked ? "DISABLED" : "DEPLOY STRATEGY"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Dynamic Risk Guardian Sidebar */}
         <div className="lg:col-span-4 space-y-6">
-          <Card className="shadow-sm border-primary/10 overflow-hidden">
+          <Card className={cn(
+            "border-none shadow-sm overflow-hidden",
+            isLocked ? "bg-bear/5" : "bg-primary/5"
+          )}>
             <div className={cn(
               "px-4 py-2 flex items-center justify-between text-white font-bold text-[10px] uppercase tracking-widest",
-              guardianStatus.status === 'CRITICAL' ? "bg-bear animate-pulse" : "bg-primary"
+              isLocked ? "bg-bear" : "bg-primary"
             )}>
               <div className="flex items-center gap-2">
                 <ShieldAlert className="w-3.5 h-3.5" />
                 AI Risk Guardian
               </div>
-              <Badge variant="outline" className="text-[9px] border-white/40 text-white font-bold h-5 uppercase">
-                {guardianStatus.status}
-              </Badge>
             </div>
             <CardContent className="p-6 space-y-6">
               <div className="flex items-start gap-4">
                 <MascotDigi expression={guardianStatus.expression} size="sm" className="shrink-0" />
-                <div className="bg-muted/40 p-3 rounded-2xl rounded-tl-none border border-primary/5 text-[11px] leading-relaxed font-medium italic">
+                <div className="bg-muted/40 p-3 rounded-2xl rounded-tl-none border border-primary/5 text-[11px] font-medium italic">
                   "{guardianStatus.message}"
                 </div>
               </div>
-              
               <div className="space-y-4 pt-2">
                 <div className="space-y-2">
                   <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
-                    <span>Session Capacity (Trade Limit)</span>
+                    <span>Session Capacity</span>
                     <span className={cn(stats.riskFactor > 80 ? "text-bear" : "text-primary")}>
                       {stats.totalTrades} / 10
                     </span>
                   </div>
                   <Progress value={stats.riskFactor} className="h-1.5" />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-background rounded-xl border border-primary/5 flex flex-col items-center text-center">
-                    <p className="text-[8px] font-bold text-muted-foreground uppercase">Revenge Risk</p>
-                    <p className={cn("text-xs font-extrabold mt-1", stats.riskFactor > 70 ? "text-bear" : "text-bull")}>
-                      {stats.riskFactor > 70 ? "HIGH" : "LOW"}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-background rounded-xl border border-primary/5 flex flex-col items-center text-center">
-                    <p className="text-[8px] font-bold text-muted-foreground uppercase">Fatigue Level</p>
-                    <p className={cn("text-xs font-extrabold mt-1", stats.totalTrades > 5 ? "text-gold" : "text-bull")}>
-                      {stats.totalTrades > 5 ? "MODERATE" : "LOW"}
-                    </p>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Quick AI Signal Stream */}
-          <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
               <Sparkles className="w-3.5 h-3.5 text-gold" />
-              Top AI Alpha Signals
+              Quick Signals
             </h3>
-            <div className="space-y-3">
-              {AI_RECOMMENDED_SIGNALS.map(s => (
-                <Card key={s.id} className="border-none shadow-sm hover:border-primary/20 transition-all cursor-pointer bg-white">
-                  <CardContent className="p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px]",
-                        s.direction === 'BUY' ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear"
-                      )}>
-                        {s.symbol.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold">{s.symbol}</p>
-                        <p className="text-[9px] text-muted-foreground uppercase">{s.type}</p>
-                      </div>
+            {AI_RECOMMENDED_SIGNALS.map(s => (
+              <Card key={s.id} className="border-none shadow-sm hover:border-primary/20 transition-all bg-white">
+                <CardContent className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px]", s.direction === 'BUY' ? "bg-bull/10 text-bull" : "bg-bear/10 text-bear")}>
+                      {s.symbol.charAt(0)}
                     </div>
-                    <div className="text-right flex items-center gap-3">
-                      <div>
-                        <p className="text-[10px] font-extrabold mono-font text-bull">₹{s.entry}</p>
-                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{s.confidence}% Match</p>
-                      </div>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary"
-                        onClick={() => executeTrade({
-                          symbol: s.symbol,
-                          side: s.direction,
-                          segment: s.segment,
-                          qty: s.qty,
-                          price: s.entry,
-                          strategy: 'AI Alpha Signal'
-                        })}
-                      >
-                        <Zap className="w-3.5 h-3.5 fill-current" />
-                      </Button>
+                    <div>
+                      <p className="text-xs font-bold">{s.symbol}</p>
+                      <p className="text-[9px] text-muted-foreground uppercase">{s.type}</p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </div>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="h-8 w-8 rounded-full"
+                    disabled={isLocked}
+                    onClick={() => executeTrade({
+                      symbol: s.symbol,
+                      side: s.direction,
+                      segment: s.segment,
+                      qty: s.qty,
+                      price: s.entry,
+                      strategy: 'AI Signal'
+                    })}
+                  >
+                    <Zap className={cn("w-3.5 h-3.5", isLocked ? "text-muted opacity-50" : "fill-current")} />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-
-          {/* Market Sentiment Barometer (Visual) */}
-          <Card className="shadow-sm border-gold/10 bg-gradient-to-br from-gold/[0.02] to-transparent overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-gold flex items-center gap-2">
-                <TrendingUp className="w-3.5 h-3.5" />
-                Institutional Sentiment
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center justify-center h-20 relative">
-                <div className="text-center">
-                  <p className="text-2xl font-black text-gold tracking-tighter uppercase">ACCUMULATION</p>
-                  <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1 italic">Institutions are holding support</p>
-                </div>
-              </div>
-              <div className="pt-2 border-t border-gold/10 grid grid-cols-2 gap-2">
-                <div className="flex items-center justify-between px-2">
-                  <span className="text-[8px] font-bold text-muted-foreground uppercase">Advancing</span>
-                  <span className="text-[9px] font-bold text-bull">1,240</span>
-                </div>
-                <div className="flex items-center justify-between px-2 border-l">
-                  <span className="text-[8px] font-bold text-muted-foreground uppercase">Declining</span>
-                  <span className="text-[9px] font-bold text-bear">680</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

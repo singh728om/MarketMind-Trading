@@ -198,7 +198,7 @@ export default function FnoIntelligence() {
              ) : (
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                   {intelligence.topRecommendedStrategies.map((strategy, idx) => (
-                    <Card key={idx} className="group relative overflow-hidden border-primary/10 hover:border-primary transition-all shadow-purple bg-card">
+                    <Card key={idx} className="group relative overflow-hidden border-primary/10 hover:border-primary transition-all shadow-sm bg-card">
                       <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
@@ -246,7 +246,7 @@ export default function FnoIntelligence() {
                         </div>
 
                         <Button 
-                          className="w-full h-10 font-bold text-xs gap-2 shadow-purple"
+                          className="w-full h-10 font-bold text-xs gap-2 shadow-sm"
                           onClick={() => handleQuickStrategy(strategy)}
                         >
                           <Zap className="w-3.5 h-3.5 fill-current" />
@@ -310,7 +310,7 @@ export default function FnoIntelligence() {
         {/* Right Intel Panel */}
         <div className="lg:col-span-4 space-y-6">
           {/* Digi's F&O Wisdom */}
-          <Card className="border-primary/20 shadow-purple bg-primary/5 overflow-hidden">
+          <Card className="border-primary/20 bg-primary/5 overflow-hidden shadow-sm">
             <CardHeader className="bg-primary p-4">
               <CardTitle className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-widest">
                 <MascotDigi expression="Coaching" size="sm" className="bg-white/20 border-none h-6 w-6" />

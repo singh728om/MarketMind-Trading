@@ -2,7 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Shield, Bell, CreditCard, ChevronDown, User, Check, Target, Trophy } from 'lucide-react';
+import { 
+  Shield, 
+  Bell, 
+  CreditCard, 
+  ChevronDown, 
+  User, 
+  Check, 
+  Target, 
+  Trophy,
+  Wallet,
+  PlusCircle,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  History,
+  Info
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -12,7 +27,8 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +49,7 @@ import {
   initiateAnonymousSignIn 
 } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import { toast } from '@/hooks/use-toast';
 
 const indices = [
   { name: 'NIFTY 50', value: '22,450.30', change: '+125.40', pct: '+0.56%', trend: 'up' },
@@ -49,14 +66,12 @@ export function TopBar() {
   const { user, isUserLoading } = useUser();
   const userId = user?.uid;
 
-  // Prototyping safeguard: Sign in anonymously if not logged in to enable profile saving
   useEffect(() => {
     if (!isUserLoading && !user && auth) {
       initiateAnonymousSignIn(auth);
     }
   }, [user, isUserLoading, auth]);
 
-  // Use memoized reference to prevent infinite loops and state resets
   const userRef = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
     return doc(firestore, 'users', userId);
@@ -65,6 +80,9 @@ export function TopBar() {
   const { data: userProfile } = useDoc(userRef);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isFundsOpen, setIsFundsOpen] = useState(false);
+  const [fundAmount, setFundAmount] = useState("");
+  
   const [formData, setFormData] = useState({
     name: "",
     experienceLevel: "Beginner",
@@ -77,7 +95,6 @@ export function TopBar() {
     return () => clearInterval(timer);
   }, []);
 
-  // Initialize form data when dialog opens or profile loads
   useEffect(() => {
     if (isProfileOpen) {
       setFormData({
@@ -90,30 +107,50 @@ export function TopBar() {
 
   const handleUpdateProfile = () => {
     if (!firestore || !userId) return;
-    
-    // Ensure we have at least a name or a placeholder
     const displayName = formData.name.trim() || user?.email?.split('@')[0] || "Trader";
     
-    const docRef = doc(firestore, 'users', userId);
-    
-    setDocumentNonBlocking(docRef, {
+    setDocumentNonBlocking(userRef!, {
       ...formData,
-      id: userId,
-      userId: userId,
       name: displayName,
-      email: user?.email || "anonymous@thedigiocean.ai",
-      plan: userProfile?.plan || "Free",
-      credits: userProfile?.credits || 100,
-      createdAt: userProfile?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }, { merge: true });
     
     setIsProfileOpen(false);
   };
 
+  const handleUpdateFunds = (type: 'add' | 'withdraw') => {
+    if (!firestore || !userId || !fundAmount) return;
+    const amount = parseFloat(fundAmount);
+    if (isNaN(amount)) return;
+
+    const currentMargin = userProfile?.availableMargin || 0;
+    const newMargin = type === 'add' ? currentMargin + amount : currentMargin - amount;
+
+    if (type === 'withdraw' && newMargin < 0) {
+      toast({
+        variant: "destructive",
+        title: "Insufficient Funds",
+        description: "You cannot withdraw more than your available margin."
+      });
+      return;
+    }
+
+    setDocumentNonBlocking(userRef!, {
+      availableMargin: newMargin,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    toast({
+      title: type === 'add' ? "Funds Added" : "Withdrawal Initiated",
+      description: `₹${amount.toLocaleString()} has been ${type === 'add' ? 'credited to' : 'debited from'} your wallet.`
+    });
+
+    setIsFundsOpen(false);
+    setFundAmount("");
+  };
+
   return (
     <header className="fixed top-0 z-50 h-16 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm px-4 flex items-center justify-between">
-      {/* Left Area: Logo and Market Status */}
       <div className="flex items-center gap-4">
         <SidebarTrigger className="text-muted-foreground hover:text-primary" />
         <Link href="/" className="flex items-center gap-2 group">
@@ -127,7 +164,6 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Center Area: Ticker */}
       <div className="flex-1 mx-8 overflow-hidden hidden lg:block">
         <div className="flex items-center gap-8 animate-scroll-left whitespace-nowrap py-1">
           {indices.map((idx, i) => (
@@ -145,7 +181,6 @@ export function TopBar() {
         </div>
       </div>
 
-      {/* Right Area: Risk, Clock, Actions */}
       <div className="flex items-center gap-4">
         <div className="hidden xl:flex flex-col items-end mr-2">
           <div className="flex items-center gap-2 text-bull font-semibold text-xs bg-bull/10 px-2 py-1 rounded-pill border border-bull/20">
@@ -163,10 +198,86 @@ export function TopBar() {
             <span className="absolute top-1 right-1 w-2 h-2 bg-bear rounded-full" />
           </button>
           
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-lg border border-primary/10">
-            <CreditCard className="w-4 h-4" />
-            <span className="mono-font text-xs font-bold">842 cr</span>
-          </div>
+          {/* Funds & Wallet Display */}
+          <Dialog open={isFundsOpen} onOpenChange={setIsFundsOpen}>
+            <DialogTrigger asChild>
+              <div className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-primary/10 text-primary rounded-lg border border-primary/10 cursor-pointer hover:bg-primary/20 transition-all group">
+                <Wallet className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <div className="flex flex-col items-end">
+                  <span className="text-[8px] font-bold uppercase opacity-70 leading-none">Avail. Funds</span>
+                  <span className="mono-font text-xs font-black">
+                    ₹{(userProfile?.availableMargin || 842000000).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[400px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-primary" />
+                  Manage Trading Funds
+                </DialogTitle>
+                <DialogDescription>Add or withdraw capital from your DigiVault.</DialogDescription>
+              </DialogHeader>
+              
+              <div className="py-6 space-y-6">
+                <div className="p-4 bg-muted/30 rounded-2xl border flex flex-col items-center justify-center text-center space-y-1">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Current Balance</p>
+                  <p className="text-3xl font-black mono-font text-primary">
+                    ₹{(userProfile?.availableMargin || 842000000).toLocaleString('en-IN')}
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Amount (INR)</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">₹</span>
+                      <Input 
+                        type="number" 
+                        placeholder="0.00" 
+                        className="pl-7 h-12 text-lg font-bold mono-font" 
+                        value={fundAmount}
+                        onChange={(e) => setFundAmount(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button 
+                      onClick={() => handleUpdateFunds('add')}
+                      className="h-12 gap-2 bg-bull hover:bg-bull/90 font-bold shadow-sm"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      ADD FUNDS
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleUpdateFunds('withdraw')}
+                      className="h-12 gap-2 border-bear/20 text-bear hover:bg-bear/5 font-bold"
+                    >
+                      <ArrowDownCircle className="w-4 h-4" />
+                      WITHDRAW
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-primary/5 rounded-xl border border-dashed flex items-start gap-3">
+                  <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Instant deposits via **UPI & Netbanking**. Withdrawals are processed within 24 hours to your linked primary bank account.
+                  </p>
+                </div>
+              </div>
+              
+              <DialogFooter className="border-t pt-4">
+                <Button variant="ghost" className="w-full text-[10px] font-bold uppercase gap-2 h-8">
+                  <History className="w-3.5 h-3.5" />
+                  View Transaction Ledger
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
             <DialogTrigger asChild>
